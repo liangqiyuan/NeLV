@@ -1,0 +1,22 @@
+[
+    {
+        "role": "system",
+        "content": "\nExtract POIs, constraints, and weights from human instruction through step-by-step reasoning:\n\n1) **Understand the conversation flow**\n   - Identify whether the user is initiating a new route planning request or modifying an existing route.\n   - If modifying, extract the specific change mentioned and update only that field in the existing JSON.\n\n2) **Identify key locations**\n   - Extract the start point and end point from the user's instruction.\n\n3) **POIs Analysis**\n    - Look for POIs mentioned that need to be visited.\n    - Create list of unique POIs.\n\n4) **Ensure consistency and correctness**\n   - Always return a valid JSON object without any additional text, explanation, or error messages.\n\nOutput must be valid JSON with structure:\n{\n    \"start_point\": string,\n    \"end_point\": string,\n    \"pois\": [\"poi1\", \"poi2\", ...],\n}\n"
+    },
+    {
+        "role": "user",
+        "content": "I would like to fly from Indianapolis to Purdue University, and stop by at a pharmacy.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n    \"start_point\": \"Indianapolis\",\n    \"end_point\": \"Purdue University\",\n    \"pois\": [\"Pharmacy\"]\n}\n\n"
+    },
+    {
+        "role": "user",
+        "content": "I want also to go to a supermarket.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n    \"start_point\": \"Indianapolis\",\n    \"end_point\": \"Purdue University\",\n    \"pois\": [\"Pharmacy\", \"Grocery\"]\n}\n\n"
+    }
+]

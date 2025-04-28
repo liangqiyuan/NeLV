@@ -1,0 +1,772 @@
+import numpy as np
+import pandas as pd
+import copy
+import os
+import xarray as xr
+import pymap3d as pm
+from PIL import Image
+import matplotlib.pyplot as plt
+import geopandas as gpd
+from shapely.geometry import LineString, box, Polygon, Point
+import ast
+from rtree import index
+from pyproj import Transformer
+import contextily as ctx
+
+
+
+
+class Path_Planner():
+    def __init__(self):
+        self.rng = np.random.default_rng(2024)
+
+    def plan_path(self, file_path, n_generation, xylims, map_source):
+
+        u_wind = xr.open_dataset(f"./data/UGRD.nc", decode_timedelta=False)
+        v_wind = xr.open_dataset(f"./data/VGRD.nc", decode_timedelta=False)
+        
+        year = '2020'; month = '12'; day = '29'
+        # sfip, cape, brn = self.weather_data(year, month, day)
+
+        w_0 = 10 # constraint penalties
+        w_1 = 1 # path distance
+        w_2 = 0 # fuel consumption
+        w_3 = 0 # weather
+        w_4 = 1 # ground risk
+
+        N = 500
+        n_points = 2
+        cruise_h = 1000
+        offset_x = 1070
+        offset_y = -70
+
+        # p_e = np.array([41.3, -85.5, cruise_h])
+        # p_s = np.array([38.1, -87.1, cruise_h])
+        # land_mark = np.array([40.3, -85.2, cruise_h])
+        # file_path = '/Users/sky/Desktop/Windracers/Path Planning/src/path_planning/Feb_Demo_results/demo_points.txt'
+
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+
+        p_s = np.array(list(map(float, lines[0].split(' '))))
+        p_e = np.array(list(map(float, lines[-1].split(' '))))
+        land_mark = []
+        for i in range(1, len(lines)-1):
+            land_mark.append(np.array(list(map(float, lines[i].split(' ')))))
+        if len(land_mark)==0:
+            max_ground_risk = 10
+        else:
+            max_ground_risk = 10*len(land_mark)
+        bound_north = [38, 41.5]
+        bound_west = [-88, -84.5]
+
+        left_bottom_corner = [u_wind['latitude'].values[0, 0], ((u_wind['longitude'].values[0, 0]+180)%360)-180]
+
+        airspace_geo = self.load_airspace(bound_north, bound_west)
+        all_cities_geo, ground_level = self.load_cities(bound_west)
+        # land_mark, p_s, p_e, all_cities, airspace, range_min, range_max = self.prep_loc(left_bottom_corner, all_cities_geo, p_s, p_e, land_mark, airspace_geo, bound_north, bound_west)
+        range_min = np.array([bound_north[0], bound_west[0], 0])
+        range_max = np.array([bound_north[1], bound_west[1], cruise_h])
+
+        x1, y1, z = pm.geodetic2enu(range_min[0], range_min[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        x2, y2, z = pm.geodetic2enu(range_max[0], range_max[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        bound_x_enu = np.arange(x1/1000, x2/1000, 3)
+        bound_y_enu = np.arange(y1/1000, y2/1000, 3)
+
+        spatial_index, airspace_geoms = self.create_idx(airspace_geo)
+        city_spatial_index, city_geoms = self.create_idx(all_cities_geo)
+
+        shortest_path_length = 0
+        shortest_path = []
+        x, y, z = pm.geodetic2enu(p_s[0], p_s[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        shortest_path.append(np.array([x/1000, y/1000]))
+        for one_land_mark in land_mark:
+            x, y, z = pm.geodetic2enu(one_land_mark[0], one_land_mark[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+            shortest_path.append(np.array([x/1000, y/1000]))
+        x, y, z = pm.geodetic2enu(p_e[0], p_e[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        shortest_path.append(np.array([x/1000, y/1000]))
+        shortest_path = np.stack(shortest_path)
+        shortest_path_length = np.sum(np.sqrt(np.sum(np.square(shortest_path[1:, :] - shortest_path[0:-1]), axis=1)))
+
+
+        W, wind_direction = self.get_wind(u_wind['u'].values, v_wind['v'].values, new=True)
+        sfip = np.zeros(np.shape(W))
+        cape = np.zeros(np.shape(W))
+        brn = np.zeros(np.shape(W))
+        smallest_time = 1
+        max_weather_risk = 1e3
+
+        temp = self.rng.random((N, n_points, 3))
+        temp_landmark = self.rng.random((N, n_points, 3))
+        population = np.zeros((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
+        velocity = self.rng.random((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
+        velocity_up = (range_max - range_min)*0.3
+        velocity_lo = -velocity_up
+
+        all_x_penalties = []
+        all_x_constraint = []
+
+        for i in range(N):
+            temp_population = np.vstack((p_s, (range_max - range_min) * temp[i] + range_min))
+            for j in range(len(land_mark)):
+                temp_population = np.vstack((temp_population, land_mark[j], (range_max - range_min) * temp_landmark[i] + range_min))
+            population[i] = np.vstack((temp_population, p_e))
+            velocity[i] = (velocity_up-velocity_lo)*velocity[i]+velocity_lo
+        population[:, :, 2] = cruise_h
+
+        p = population.copy()
+        [constraint_violation, penalties, weather_penalties, ground_penalties] = (
+                self.get_fitness(population, spatial_index, airspace_geoms, W, wind_direction,
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+        initial_penalties = (w_0 * np.sum(constraint_violation, axis=1) + w_1 * penalties[:, 0] + w_2 * penalties[:, 1] + w_3 * weather_penalties + w_4 * ground_penalties)
+        g = np.min(initial_penalties)
+        best_path = population[np.argmin(initial_penalties), :]
+
+        for i in range(n_generation+1):
+            velocity *= -1/n_generation*i + 1
+            new_population = self.update_population(population, velocity, p, best_path)
+            for j, one_land_mark in enumerate(land_mark):
+                new_population[:, int((n_points+1)*(j+1)), :] = one_land_mark
+                p[:, int((n_points+1)*(j+1)), :] = one_land_mark
+
+            new_population[:, :, 2] = cruise_h
+            new_population[:, 0, :] = p_s
+            new_population[:, -1, :] = p_e
+            p[:, :, 2] = cruise_h
+            p[:, 0, :] = p_s
+            p[:, -1, :] = p_e
+
+            [x_constraint_violation, x_penalties, x_weather_penalties, x_ground_penalties] = (
+                self.get_fitness(new_population, spatial_index, airspace_geoms, W, wind_direction,
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+            [p_constraint_violation, p_penalties, p_weather_penalties, p_ground_penalties] = (
+                self.get_fitness(p, spatial_index, airspace_geoms, W, wind_direction,
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+
+            x_real_penalties = (w_0 * np.sum(x_constraint_violation, axis=1) +
+                                w_1 * (1-shortest_path_length/x_penalties[:, 0]) +
+                                w_2 * (1-smallest_time/x_penalties[:, 1]) +
+                                w_3 * x_weather_penalties/max_weather_risk + w_4 * x_ground_penalties/max_ground_risk)
+
+            all_x_penalties.append(x_real_penalties)
+            all_x_constraint.append(np.sum(x_constraint_violation, axis=1))
+            p_real_penalties = (w_0 * np.sum(p_constraint_violation, axis=1) +
+                                w_1 * (1-shortest_path_length/p_penalties[:, 0]) +
+                                w_2 * (1-smallest_time/p_penalties[:, 1]) +
+                                w_3 * p_weather_penalties/max_weather_risk + w_4 * p_ground_penalties/max_ground_risk)
+
+
+            idx = np.where(x_real_penalties <= p_real_penalties)
+            p[idx] = new_population[idx]
+            p_real_penalties[idx] = x_real_penalties[idx]
+            if np.any(p_real_penalties < g):
+                print('================================')
+                g = np.min(p_real_penalties)
+                best_path = p[np.argmin(p_real_penalties)]
+            if np.any(x_penalties[:, 0] < shortest_path_length):
+                raise Exception("Shorter than the shortest path!")
+            population = new_population.copy()
+
+            print(f'Finished No.{i + 1} generation!')
+
+        best_path[0,2] = 0
+        best_path[-1,2] = 0
+
+        np.savetxt('./temp/path_coordinates.txt', best_path)
+        self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source)
+
+    def weather_data(self, year, month, day):
+        clwmr = xr.open_dataset(f"data/{year + month + day}/CLMR.nc")
+        cice = xr.open_dataset(f"data/{year + month + day}/CIMIXR.nc")
+        spfh = xr.open_dataset(f"data/{year + month + day}/SPFH.nc")
+        rwmr = xr.open_dataset(f"data/{year + month + day}/RWMR.nc")
+        snmr = xr.open_dataset(f"data/{year + month + day}/SNMR.nc")
+        rh = xr.open_dataset(f"data/{year + month + day}/RH.nc")['r'].values
+        vvel = xr.open_dataset(f"data/{year + month + day}/VVEL.nc")['w'].values
+        t = xr.open_dataset(f"data/{year + month + day}/TMP.nc")['t'].values - 273.15
+        cape = xr.open_dataset(f"data/{year + month + day}/CAPE.nc")['cape'].values
+        vucsh = xr.open_dataset(f"data/{year + month + day}/VUCSH.nc")['vucsh'].values
+        vvcsh = xr.open_dataset(f"data/{year + month + day}/VVCSH.nc")['vvcsh'].values
+
+        m_rh = copy.copy(rh)
+        m_t = copy.copy(t)
+        m_vvel = copy.copy(vvel)
+        m_cape = copy.copy(cape)
+
+        brn = copy.copy(cape)/(0.5*(vucsh**2 + vvcsh**2))
+        m_brn = copy.copy(brn)
+
+        lwc = 1000 * clwmr['clwmr'].values / (
+                    cice['unknown'].values + (spfh['q'].values/(1-spfh['q'].values)) + rwmr['rwmr'].values + snmr['snmr'].values)
+        m_lwc = copy.copy(lwc)
+        m_lwc[lwc <= 0.4] /= 0.4
+        m_lwc[lwc > 0.4] = 1
+
+        m_vvel[vvel <= -0.5] = 1
+        m_vvel[(vvel > -0.5) & (vvel <= 0)] /= -0.5
+        m_vvel[(vvel > 0) & (vvel <= 1)] *= -0.4
+        m_vvel[vvel > 1] = -0.4
+
+        m_rh[rh <= 60] = 0
+        m_rh[(rh > 60) & (rh <= 97)] = ((rh[(rh > 60) & (rh <= 97)] - 60)/37)**2
+        m_rh[rh > 97] = 1
+
+        m_t[t < -28] = 0
+        m_t[(t >= -28) & (t <= -12)] = (t[(t >= -28) & (t <= -12)] + 28)/16
+        m_t[(t > -12) & (t <= 0)] = 1
+        m_t[(t > 0) & (t <= 0.1)] = 1 - (t[(t > 0) & (t <= 0.1)])*10
+        m_t[t > 1] = 0
+
+        m_cape[cape <= 0] = 0
+        m_cape[(cape > 0) & (cape <= 1000)] = 1
+        m_cape[(cape > 1000) & (cape <= 2500)] = 2
+        m_cape[(cape > 2500) & (cape <= 3500)] = 3
+        m_cape[cape > 3500] = 4
+
+        m_brn[brn <= 10] = 0
+        m_brn[(brn > 10) & (brn <= 50)] = 1
+        m_brn[brn > 50] = 2
+
+        alpha = 0.35
+        beta = 0.2
+        gamma = 0.45
+        sfip = m_t * (alpha*m_rh + beta*m_vvel + gamma*m_lwc)
+        sfip[sfip < 0] = 0
+
+        return sfip, m_cape, m_brn
+    
+    def create_idx(self, object):
+        spatial_index = index.Index()
+        airspace_geoms = []
+        for idx, area in enumerate(object):
+            airspace_geom = Polygon(area)
+            airspace_geoms.append(airspace_geom)
+            spatial_index.insert(idx, airspace_geom.bounds)
+        return spatial_index, airspace_geoms
+
+    def load_cities(self, bound_west):
+        df = pd.read_csv('./data/indiana_cities_with_area.csv')
+        # x = df['Bounding Box']
+        all_bbox = []
+        ground_level = []
+
+        for i, item in enumerate(df['Bounding Box'].apply(ast.literal_eval)):
+            temp = []
+            temp.append([item[0], item[2]])
+            temp.append([item[0], item[3]])
+            temp.append([item[1], item[3]])
+            temp.append([item[1], item[2]])
+            temp.append([item[0], item[2]])
+            all_bbox.append(temp)
+            if df['Population Density'][i] >= 500:
+                ground_level.append(10)
+            elif df['Population Density'][i] >= 100:
+                ground_level.append(5)
+            elif df['Population Density'][i] >= 10:
+                ground_level.append(1)
+            else:
+                ground_level.append(0)
+
+
+        box_idx = len(all_bbox) - 1
+        while box_idx >= 0:
+            if np.max(np.stack(all_bbox[box_idx])[:, 1]) > bound_west[1]:
+                all_bbox.pop(box_idx)
+            box_idx -= 1
+
+        return all_bbox, np.stack(ground_level)
+    
+    def prep_loc(self, left_bottom_corner, all_cities, p_s, p_e, land_mark, airspaces, bound_north, bound_west):
+        # Convert geodetic to ENU (East-North-Up)
+        # width = 1799 * 3
+        # height = 1059 * 3
+        range_max = []
+        range_min = []
+
+        new_cities = []
+        for city in all_cities:
+            geo_loc = np.stack(city)
+            x, y, z = pm.geodetic2enu(left_bottom_corner[0], left_bottom_corner[1], 0, geo_loc[:, 0], geo_loc[:, 1], 0)
+            distance_loc = (np.stack((np.abs(x) / 1000, np.abs(y) / 1000, np.zeros((geo_loc.shape[0],))))).T
+            new_cities.append(distance_loc)
+
+        x, y, z = pm.geodetic2enu(p_s[0], p_s[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        p_s[0] = np.abs(x) / 1000
+        p_s[1] = np.abs(y) / 1000
+        x, y, z = pm.geodetic2enu(p_e[0], p_e[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        p_e[0] = np.abs(x) / 1000
+        p_e[1] = np.abs(y) / 1000
+        x, y, z = pm.geodetic2enu(land_mark[0], land_mark[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        land_mark[0] = np.abs(x) / 1000
+        land_mark[1] = np.abs(y) / 1000
+
+        x, y, z = pm.geodetic2enu(bound_north[0], bound_west[0], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+        range_min.append(np.abs(x) / 1000)
+        range_min.append(np.abs(y) / 1000)
+        range_min.append(0)
+
+        x, y, z = pm.geodetic2enu(bound_north[1], bound_west[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0, )
+        range_max.append(np.abs(x) / 1000)
+        range_max.append(np.abs(y) / 1000)
+        range_max.append(5)
+
+        new_airspace = []
+        for airspace in airspaces:
+            geo_loc = np.stack(airspace)
+            x, y, z = pm.geodetic2enu(geo_loc[:, 0], geo_loc[:, 1], 0, left_bottom_corner[0], left_bottom_corner[1], 0, )
+            distance_loc = (np.stack((np.abs(x) / 1000, np.abs(y) / 1000, np.zeros((geo_loc.shape[0],))))).T
+            new_airspace.append(distance_loc)
+
+        return land_mark, p_s, p_e, new_cities, new_airspace, np.stack(range_min), np.stack(range_max)
+
+    def prep_loc_new(self, left_bottom_corner, p_s, p_e, land_mark, bound_north, bound_west):
+        # Convert geodetic to ENU (East-North-Up)
+        # width = 1799 * 3
+        # height = 1059 * 3
+        range_max = []
+        range_min = []
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:3857", always_xy=True)
+
+        x_0, y_0 = transformer.transform(left_bottom_corner[1], left_bottom_corner[0])
+
+        x, y = transformer.transform(p_e[1], p_e[0])
+        p_e[0] = np.abs(y-y_0) / 1000
+        p_e[1] = np.abs(x-x_0) / 1000
+        x, y = transformer.transform(p_s[1], p_s[0])
+        p_s[0] = np.abs(y - y_0) / 1000
+        p_s[1] = np.abs(x - x_0) / 1000
+
+        x, y = transformer.transform(land_mark[1], land_mark[0])
+        land_mark[0] = np.abs(y-y_0) / 1000
+        land_mark[1] = np.abs(x-x_0) / 1000
+
+        x, y = transformer.transform(bound_west[0], bound_north[0])
+        range_min.append(np.abs(y-y_0) / 1000)
+        range_min.append(np.abs(x-x_0) / 1000)
+        range_min.append(0)
+
+        x, y = transformer.transform(bound_west[1], bound_north[1])
+        range_max.append(np.abs(y-y_0) / 1000)
+        range_max.append(np.abs(x-x_0) / 1000)
+        range_max.append(5)
+
+        return land_mark, p_s, p_e, np.stack(range_min), np.stack(range_max)
+
+    def load_airspace(self, bound_north, bound_west):
+        file_path = './data/us_asp.txt'
+
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+
+        all_airspace = []
+        temp = []
+        record = False
+
+        for i in range(len(lines) - 1):
+            line = lines[i]
+            split_line = line.split(' ')
+            if line[0:2] == 'AN':
+                if line[-6:-1] == 'NOTAM':
+                    record = True
+                else:
+                    record = False
+            if line[0:2] == 'AL':
+                try:
+                    alt = int(split_line[1][0:-2])
+                except:
+                        alt = 1e6
+                if line[3:6] == 'GND' or alt <= 1500:
+                    record = True
+                else:
+                    record = False
+            if record:
+                if line[0:2] == 'DP':
+                    north = list(map(float, line[3:14].split(':')))
+                    west = list(map(float, line[19:-3].split(':')))
+                    temp.append([north[0] + north[1] / 60 + north[2] / 3600, -(west[0] + west[1] / 60 + west[2] / 3600)])
+                    if not lines[i + 1].strip():
+                        all_airspace.append(temp)
+                        temp = []
+
+        inbound_airspace = []
+        for airspace in all_airspace:
+            for points in airspace:
+                if bound_north[0] < points[0] < bound_north[1]:
+                    if bound_west[0] < points[1] < bound_west[1]:
+                        inbound_airspace.append(airspace)
+                        break
+        airspace_idx = 0
+        while airspace_idx < len(inbound_airspace):
+            temp = np.stack(inbound_airspace[airspace_idx])
+            if np.max(temp[:, 1]) > bound_west[1]:
+                inbound_airspace.pop(airspace_idx)
+            else:
+                airspace_idx += 1
+        for i, airspace in enumerate(inbound_airspace):
+            if airspace[0] != airspace[-1]:
+                inbound_airspace[i].append(airspace[0])
+
+        return inbound_airspace
+
+    def check_cylinders(self, p1, p2, cy_loc, cy_shape, ground_level, ground):
+        temp = p2 - p1
+        line_length = np.sqrt(np.sum(np.square(temp), axis=1))
+        A = temp[:, 1] / temp[:, 0]
+        C = p1[:, 1] - A * p1[:, 0]
+        a = 1 + np.square(A)
+        count = 0
+        ground_penalties = 0
+
+        for j in range(0, np.shape(cy_loc)[0]):
+
+            b = 2 * A * C - 2 * A * cy_loc[j, 1] - 2 * cy_loc[j, 0]
+            c = np.square(cy_loc[j, 0]) + np.square(cy_loc[j, 1]) + np.square(C) - 2 * cy_loc[j, 1] * C - np.square(
+                cy_shape[j, 0])
+
+            circle_check = np.square(p1[:, 0] - cy_loc[j, 0]) + np.square(p1[:, 1] - cy_loc[j, 1]) - np.square(
+                cy_shape[j, 0])
+            find_temp = np.where(circle_check[0:-1] < 0 & (p1[0:-1, 2] <= cy_shape[j, 1]))[0]
+            if find_temp.size > 0:
+                find_temp = np.concatenate((find_temp, find_temp - 1))
+
+            check = b * b - 4 * a * c
+            collide_line = [0]
+
+            if np.any(check > 0):
+                idx = np.where(check > 0)[0]
+
+                a_idx = a[idx]
+                b_idx = b[idx]
+                c_idx = c[idx]
+
+                int_1 = (-b_idx + np.sqrt(b_idx * b_idx - 4 * a_idx * c_idx)) / (2 * a_idx)
+                int_2 = (-b_idx - np.sqrt(b_idx * b_idx - 4 * a_idx * c_idx)) / (2 * a_idx)
+
+                t_1 = (int_1 - p1[idx, 0]) / temp[idx, 0]
+                t_2 = (int_2 - p1[idx, 0]) / temp[idx, 0]
+
+                z_1 = np.squeeze(p1[idx, 2] + temp[idx, 2] * t_1)
+                z_2 = np.squeeze(p1[idx, 2] + temp[idx, 2] * t_2)
+
+
+                all_int_1 = np.column_stack((int_1, A[idx] * int_1 + C[idx], z_1))
+                all_int_2 = np.column_stack((int_2, A[idx] * int_2 + C[idx], z_2))
+
+
+                dist_1 = np.max(np.array([np.sqrt(np.sum(np.square(all_int_1 - p1[idx]), axis=1)),
+                                          np.sqrt(np.sum(np.square(all_int_1 - p2[idx]), axis=1))]), axis=0)
+                dist_2 = np.max(np.array([np.sqrt(np.sum(np.square(all_int_2 - p1[idx]), axis=1)),
+                                          np.sqrt(np.sum(np.square(all_int_2 - p2[idx]), axis=1))]), axis=0)
+
+
+                find_1 = np.where((dist_1 <= line_length[idx]) & (z_1 < np.squeeze(cy_shape[j, 1])))[0]
+                find_2 = np.where((dist_2 <= line_length[idx]) & (z_2 < np.squeeze(cy_shape[j, 1])))[0]
+
+                collide_line = np.unique(np.concatenate((find_temp, find_1, find_2)))
+                count += len(collide_line)
+
+                if ground:
+                    another_collide_line = np.unique(np.concatenate((find_1, find_2)))
+                    if len(another_collide_line) > 0:
+                        all_int = np.abs(all_int_1[another_collide_line, 0:2] - all_int_2[another_collide_line, 0:2])
+                        ground_penalties += ground_level[j] * np.sum(np.sqrt(all_int[:, 0]**2 + all_int[:, 1]**2))
+        if ground:
+            return ground_penalties
+        else:
+            return count
+
+    def check_airspace(self, path, spatial_index, airspace_geoms):
+        count = 0
+        for i in range(len(path) - 1):
+            path_segment = LineString([path[i], path[i + 1]])
+            candidate_airspaces = list(spatial_index.intersection(path_segment.bounds))
+            for idx in candidate_airspaces:
+                if path_segment.intersects(airspace_geoms[idx]):
+                    count += 1
+                    break
+        return count
+    
+    def check_ground(self, path, city_spatial_index, city_geoms, ground_level):
+        ground_penalties = 0
+        for i in range(len(path) - 1):
+            path_segment = LineString([path[i], path[i + 1]])
+            candidate_airspaces = list(city_spatial_index.intersection(path_segment.bounds))
+            for j, idx in enumerate(candidate_airspaces):
+                intersection = path_segment.intersection(city_geoms[idx])
+                if not intersection.is_empty:
+                    ground_penalties += intersection.length * ground_level[j]
+                    break
+        return ground_penalties
+
+    def line_grid_val(self, p1, p2, bound_x, bound_y):
+        x = bound_x + 1
+        y = bound_y + 1
+        m = (p2[1] - p1[1]) / (p2[0] - p1[0])
+        b = p1[1] - m * p1[0]
+        mb = np.array([m, b])
+
+        def lxmb(x, mb):
+            return mb[0] * x + mb[1]
+
+        def hix(y, mb):
+            return np.array([(y - mb[1]) / mb[0], y])
+
+        def vix(x, mb):
+            return np.array([x, lxmb(x, mb)])
+
+        hrz = hix(y, mb).T
+        vrt = vix(x, mb).T
+        hvix = np.vstack((hrz, vrt))
+
+        if m > 0:
+            if p1[1] < p2[1]:
+                exbd = np.where((hvix[:, 1] < p1[1]) | (hvix[:, 1] > p2[1]))[0]
+            else:
+                exbd = np.where((hvix[:, 1] > p1[1]) | (hvix[:, 1] < p2[1]))[0]
+        else:
+            if p1[1] > p2[1]:
+                exbd = np.where((hvix[:, 1] < p2[1]) | (hvix[:, 1] > p1[1]))[0]
+            else:
+                exbd = np.where((hvix[:, 1] > p2[1]) | (hvix[:, 1] < p1[1]))[0]
+
+        hvix = np.delete(hvix, exbd, axis=0)
+        hvix = np.unique(hvix, axis=0)
+
+        dx = x[1] - x[0]
+        dy = y[1] - y[0]
+
+        idx = np.argsort(hvix[:, 0])
+        hvix = hvix[idx, :]
+
+        line_segment = hvix
+
+        diff = line_segment[0:-1, :] - line_segment[1:, :]
+        line_length = np.sqrt(diff[:, 0] ** 2 + diff[:, 1] ** 2)
+
+        if m > 0:
+            grid_x = (np.ceil((hvix[:, 0] - x[0]) / dx)+bound_x[0]/3).astype(int)
+            last_x = (np.ceil((p2[0] - x[0]) / dx)+bound_x[0]/3).astype(int)
+            grid_y = (np.ceil((hvix[:, 1] - y[0]) / dy)+bound_y[0]/3).astype(int)
+            last_y = (np.ceil((p2[1] - y[0]) / dy)+bound_y[0]/3).astype(int)
+        else:
+            grid_x = (np.ceil((hvix[:, 0] - x[0]) / dx)+bound_x[0]/3).astype(int)
+            last_x = (np.ceil((p2[0] - x[0]) / dx + 1)+bound_x[0]/3).astype(int)
+            grid_y = (np.floor((hvix[:, 1] - y[0]) / dy + 1)+bound_y[0]/3).astype(int)
+            last_y = (np.ceil((p2[1] - y[0]) / dy)+bound_y[0]/3).astype(int)
+
+        grid_pos = np.vstack((np.hstack((grid_y, last_y)), np.hstack((grid_x, last_x))))
+
+        return line_length, grid_pos-1, hvix
+
+    def get_fitness(self, population, spatial_index, airspace_geoms, W, wind_direction, sfip, cape, brn, city_spatial_index, city_geoms,
+                    ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu):
+        turn_angle = []
+        constraint_violation = np.zeros((len(population), 4))
+        penalties = []
+        weather_penalties = []
+        ground_penalties = []
+
+        max_turn_angle = 90
+        bound_x = np.array([range_min[0], range_max[0]])
+        bound_y = np.array([range_min[1], range_max[1]])
+
+
+        population_enu = np.zeros_like(population)
+        for i in range(np.shape(population)[1]):
+            x, y, z = pm.geodetic2enu(
+                population[:, i, 0],
+                population[:, i, 1],
+                np.zeros(population.shape[0]),
+                left_bottom_corner[0],
+                left_bottom_corner[1],
+                0
+            )
+            population_enu[:, i, :] = np.column_stack((x / 1000, y / 1000, np.zeros_like(x)))
+
+        for i in range(0, np.shape(population)[0]):
+            temp_enu = population_enu[i, 1:] - population_enu[i, 0:-1]
+            line_length = np.sqrt(np.sum(np.square(temp_enu), axis=1))
+
+            temp = population[i, 1:] - population[i, 0:-1]
+            turn_angle.append(
+                np.diagonal(np.matmul(temp[0:-1, 0:2], (temp[1:, 0:2]).T)) / (np.sqrt(np.square(temp[0:-1, 0]) +
+                                                                                      np.square(temp[0:-1, 1])) * np.sqrt(
+                    np.square(temp[1:, 0]) + np.square(temp[1:, 1]))))
+            constraint_violation[i, 0] += np.sum(np.cos(np.radians(max_turn_angle)) > turn_angle[i])
+
+            constraint_violation[i, 1] = 0
+
+            count = self.check_airspace(population[i], spatial_index, airspace_geoms)
+            # ground_penalties.append(
+            #     self.check_cylinders(p1, p2, ground_risk_locations, ground_risk_shape, ground_level, True))
+            ground_penalties.append(self.check_ground(population[i], city_spatial_index, city_geoms, ground_level))
+
+            constraint_violation[i, 2] += count
+
+            constraint_violation[i, 3] += np.sum(population[i, :, 0] > bound_x[1])
+            constraint_violation[i, 3] += np.sum(population[i, :, 1] > bound_y[1])
+            constraint_violation[i, 3] += np.sum(population[i, :, 0] < bound_x[0])
+            constraint_violation[i, 3] += np.sum(population[i, :, 1] < bound_y[0])
+
+            time_segment = []
+            weather_segment = 0
+            all_line_segment_length = 0
+
+            for j in range(0, np.shape(population)[1] - 1):
+                loc_1 = np.squeeze(population[i, j, 0:2])
+                loc_2 = np.squeeze(population[i, j + 1, 0:2])
+
+                [line_segment_length, grid_pos, hvix] = self.line_grid_val(np.squeeze(population_enu[i, j, 0:2]), np.squeeze(population_enu[i, j + 1, 0:2]),
+                                                                           bound_x_enu, bound_y_enu)
+
+                all_line_segment_length += np.sum(line_segment_length)
+                hvix_not_empty = hvix.size > 0 
+                loc_x_min = min(loc_1[0], loc_2[0])
+                loc_x_max = max(loc_1[0], loc_2[0])
+                loc_y_min = min(loc_1[1], loc_2[1])
+                loc_y_max = max(loc_1[1], loc_2[1])
+
+                condition = (hvix_not_empty and
+                             loc_x_min >= bound_x[0] and loc_x_max <= bound_x[-1] and
+                             loc_y_min >= bound_y[0] and loc_y_max <= bound_y[-1])
+
+                # Code to execute if the condition is True
+                if np.linalg.norm(loc_2 - loc_1) < 1e-6:
+                    time_segment.append(1)
+                elif condition:
+                    # sfip_part = sfip[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+                    # cape_part = cape[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+                    # brn_part = brn[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+
+                    w_part = W[grid_pos[0], grid_pos[1]]
+                    wind_direction_1 = wind_direction[grid_pos[0], grid_pos[1]]
+                    # wind_direction_2 = np.stack((np.sin(np.radians(wind_direction_1)), np.cos(np.radians(wind_direction_1)))).T
+                    wind = np.stack(
+                        (w_part * np.sin(np.radians(wind_direction_1)), w_part * np.cos(np.radians(wind_direction_1)))).T
+                    ground_speed = population[i, j + 1, 0:2] - population[i, j, 0:2]
+                    ground_speed_normalized = ground_speed / np.linalg.norm(ground_speed)
+                    D = ground_speed_normalized[0] * wind[:, 0] + ground_speed_normalized[1] * wind[:, 1] + np.sqrt(
+                        np.square(ground_speed_normalized[0] * wind[:, 0] + ground_speed_normalized[1] * wind[:,
+                                                                                                         1]) + 6400 - wind[
+                                                                                                                      :,
+                                                                                                                      0] ** 2 - wind[
+                                                                                                                                :,
+                                                                                                                                1] ** 2)
+                    airspeed = (np.expand_dims(D, axis=1) * np.expand_dims(ground_speed_normalized, axis=0) - wind)
+                    ground_speed = wind + airspeed
+                    ground_speed = ground_speed[1:-1]
+                    time_segment.append(line_segment_length / (1.85200 * np.sqrt(np.sum(np.square(ground_speed), axis=1))))
+                    # weather_segment += np.sum(sfip_part + cape_part + brn_part)
+                else:
+                    time_segment.append(1)
+
+            if len(time_segment) > 0:
+                penalties.append([np.sum(line_length, axis=0), np.sum(np.hstack(time_segment))])
+                # weather_penalties.append(weather_segment)
+                weather_penalties.append(0)
+            else:
+                penalties.append([np.sum(line_length, axis=0), 0])
+                weather_penalties.append(0)
+
+        penalties = np.stack(penalties)
+        weather_penalties = np.stack(weather_penalties)
+        ground_penalties = np.stack(ground_penalties)
+
+        return constraint_violation, penalties, weather_penalties, ground_penalties
+
+    def get_angle(self, u, v):
+        x = np.arctan2(v, u) * 180 / np.pi
+        if x < 0:
+            x = abs(x) + 90
+        else:
+            x = 90 - x
+            if x < 0:
+                x = 360 + x
+        return x
+
+    def get_wind(self, data_1, data_2, new=False):
+        if not new:
+            u = np.squeeze(data_1[:, :, 0])
+            v = np.squeeze(data_1[:, :, 1])
+        else:
+            u = data_1
+            v = data_2
+        M = np.sqrt(np.square(u) + np.square(v))
+        wind_direction = np.ones(np.shape(u))
+        for i in range(0, u.shape[0]):
+            for j in range(0, u.shape[1]):
+                wind_direction[i, j] = self.get_angle(u[i, j], v[i, j])
+
+        return M, wind_direction
+
+    def create_cylinder(self, radius, height=1, num_points=100):
+        theta = np.linspace(0, 2 * np.pi, num_points)
+        z = np.array([0, height])
+
+        X = np.outer(np.cos(theta), np.ones(2)) * radius  # (num_points, 2)
+        Y = np.outer(np.sin(theta), np.ones(2)) * radius  # (num_points, 2)
+        Z = np.outer(np.ones(num_points), z)  # (num_points, 2)
+
+        return X, Y, Z
+    
+    
+
+    def update_population(self, population, velocity, p, g): # population:(N, n_points, 3)
+        # w = 0.7298
+        # c1 = 1.496
+        # c2 = 1.496
+        w = 0.8
+        c1 = 1.496
+        c2 = 1.496
+
+        rp = self.rng.random((np.shape(population)))
+        rg = self.rng.random((np.shape(population)))
+        g = np.tile(g, (np.shape(population)[0], 1, 1))
+
+        velocity = w*velocity + c1*rp*(p - population) + c2*rg*(g - population)
+        return population+velocity
+
+    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source):
+        fig, ax = plt.subplots(figsize=(8, 8))
+        ax.set_xlim(xylims[0][0], xylims[0][1])
+        ax.set_ylim(xylims[1][0], xylims[1][1])
+
+        airspace_gdf_list = []
+        for area in airspace_geo:
+            geometry = LineString([(point[1], point[0]) for point in area])
+            airspace_gdf_list.append(gpd.GeoDataFrame(geometry=[geometry], crs="EPSG:4326"))
+        
+        if airspace_gdf_list:
+            airspace_gdf = gpd.GeoDataFrame(pd.concat(airspace_gdf_list, ignore_index=True), crs="EPSG:4326")
+            airspace_gdf.plot(ax=ax, color='blue')
+        
+        cities_gdf_list = []
+        for city in all_cities_geo:
+            geometry = LineString([(point[1], point[0]) for point in city])
+            cities_gdf_list.append(gpd.GeoDataFrame(geometry=[geometry], crs="EPSG:4326"))
+        
+        if cities_gdf_list:
+            cities_gdf = gpd.GeoDataFrame(pd.concat(cities_gdf_list, ignore_index=True), crs="EPSG:4326")
+            cities_gdf.plot(ax=ax, color='red')
+        
+        points = [(point[1], point[0]) for point in best_path]
+        points_gdf = gpd.GeoDataFrame(geometry=[Point(xy) for xy in points], crs="EPSG:4326")
+        
+        
+        start_point = points_gdf.iloc[[0]]
+        start_point.plot(ax=ax, color='red', marker='*', markersize=200, edgecolor='black', label='Start', zorder=3)
+        end_point = points_gdf.iloc[[-1]]
+        end_point.plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', label='End', zorder=3)
+        
+        path_gdf = gpd.GeoDataFrame(geometry=[LineString(points)], crs="EPSG:4326")
+        path_gdf.plot(ax=ax, color='black', linewidth=3)
+        for j in range(len(land_mark)):
+            idx = int((n_points+1)*(j+1))
+            if idx < len(points_gdf):
+                way_point = points_gdf.iloc[[idx]]
+                way_point.plot(ax=ax, color='black', markersize=150, edgecolor='black', label='Mission Point', zorder=2)
+
+        ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
+        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
+        plt.axis('off')
+        plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0)

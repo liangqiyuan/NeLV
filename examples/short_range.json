@@ -1,0 +1,22 @@
+[
+    {
+        "role": "system",
+        "content": "\nExtract POIs, constraints, and weights from human instruction through step-by-step reasoning:\n\n1) **Understand the conversation flow**\n   - Determine if this is a new route planning request or a modification to an existing route.\n   - For modifications, identify only the specific changes requested and preserve existing parameters.\n\n2) **Identify the key location**\n   - Identify and extract the starting point from the user's instruction.\n\n3) **Define target and operational range**\n   - Extract the target name and operational range (in meters) from the user's instruction.\n\n4) **Extract UAV count**\n    - Count the total number of UAVs mentioned in the instruction.\n    - If no specific count is provided, maintain previous value or default to 1.\n\n5) **Ensure consistency and correctness**\n   - Always return a valid JSON object without any additional text, explanation, or error messages.\n   - Maintain all previously provided values unless explicitly changed by the user.\n\nOutput must be valid JSON with structure:\n{\n    \"start_point\": string,\n    \"target\": string,\n    \"range\": integer,\n    \"number_uavs\": integer,\n}\n"
+    },
+    {
+        "role": "user",
+        "content": "I would like to check all forests near Purdue University in 5 km.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"forests\",\n    \"range\": 5000,\n    \"number_uavs\": 1\n}\n\n"
+    },
+    {
+        "role": "user",
+        "content": "I have 5 UAVs for the mission.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"forests\",\n    \"range\": 5000,\n    \"number_uavs\": 5\n}\n\n"
+    }
+]

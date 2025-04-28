@@ -1,0 +1,22 @@
+[
+    {
+        "role": "system",
+        "content": "\nExtract the task description and selection criteria from human instruction through step-by-step reasoning:\n\n1) **Understand the conversation flow**\n   - Identify whether the user is initiating a new route planning request or modifying an existing route.\n   - If modifying, extract the specific change mentioned and update only that field in the existing JSON.\n\n2) **Identify key locations**\n   - Extract the start point and end point from the user's instruction.\n\n3) **Determine the flight option**\n   - The flight statoptionion must always be 'balanced', 'cheapest', or 'shortest'.\n\n4) **Ensure consistency and correctness**\n   - Always return a valid JSON object without any additional text, explanation, or error messages.\n\nOutput must be valid JSON with structure:\n{\n   \"start_point\": string,\n   \"end_point\": string,\n   \"flight_option\": string\n}\n"
+    },
+    {
+        "role": "user",
+        "content": "I would like to fly from New York to Los Angeles.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n   \"start_point\": \"New York\",\n   \"end_point\": \"Los Angeles\",\n   \"flight_option\": \"balanced\"\n}\n\n"
+    },
+    {
+        "role": "user",
+        "content": "I would like to fly cheapest.\nOnly output the JSON object. No prefix, additional text, or explanation.\n\n"
+    },
+    {
+        "role": "assistant",
+        "content": "{\n   \"start_point\": \"New York\",\n   \"end_point\": \"Los Angeles\",\n   \"flight_option\": \"cheapest\"\n}\n\n"
+    }
+]
