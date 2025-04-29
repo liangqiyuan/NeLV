@@ -26,27 +26,28 @@ class Path_Planner():
         v_wind = xr.open_dataset(f"./data/VGRD.nc", decode_timedelta=False)
         
         year = '2020'; month = '12'; day = '29'
-        # sfip, cape, brn = self.weather_data(year, month, day)
+        sfip, cape, brn = self.weather_data(year, month, day)
 
         w_0 = 10 # constraint penalties
         w_1 = 1 # path distance
         w_2 = 0 # fuel consumption
-        w_3 = 0 # weather
-        w_4 = 1 # ground risk
+        w_3 = 0.05 # weather
+        w_4 = 0.05 # ground risk
 
-        N = 500
+        N = 100
         n_points = 2
         cruise_h = 1000
-        offset_x = 1070
-        offset_y = -70
-
-        # p_e = np.array([41.3, -85.5, cruise_h])
-        # p_s = np.array([38.1, -87.1, cruise_h])
-        # land_mark = np.array([40.3, -85.2, cruise_h])
-        # file_path = '/Users/sky/Desktop/Windracers/Path Planning/src/path_planning/Feb_Demo_results/demo_points.txt'
+        # offset_x = 1070
+        # offset_y = -70
 
         with open(file_path, "r") as file:
             lines = file.readlines()
+
+        path_latitude = []
+        path_longitude = []
+        for i in lines:
+          path_latitude.append(list(map(float, i.split(' ')))[0])
+          path_longitude.append(list(map(float, i.split(' ')))[1])
 
         p_s = np.array(list(map(float, lines[0].split(' '))))
         p_e = np.array(list(map(float, lines[-1].split(' '))))
@@ -57,12 +58,16 @@ class Path_Planner():
             max_ground_risk = 10
         else:
             max_ground_risk = 10*len(land_mark)
-        bound_north = [38, 41.5]
-        bound_west = [-88, -84.5]
+
+        # Based on mission's bound
+        bound_north = [max(u_wind['latitude'].values[0, 0], min(path_latitude) - 1),
+                       min(u_wind['latitude'].values[-1, 0] - 2.5, max(path_latitude) + 1)]
+        bound_west = [max((u_wind['longitude'].values[0, 0] + 180) % 360 - 180, min(path_longitude) - 1),
+                      min((u_wind['longitude'].values[0, -1] + 180) % 360 - 180, max(path_longitude) + 1)]
 
         left_bottom_corner = [u_wind['latitude'].values[0, 0], ((u_wind['longitude'].values[0, 0]+180)%360)-180]
 
-        airspace_geo = self.load_airspace(bound_north, bound_west)
+        airspace_geo, long_range = self.load_airspace(bound_north, bound_west)
         all_cities_geo, ground_level = self.load_cities(bound_west)
         # land_mark, p_s, p_e, all_cities, airspace, range_min, range_max = self.prep_loc(left_bottom_corner, all_cities_geo, p_s, p_e, land_mark, airspace_geo, bound_north, bound_west)
         range_min = np.array([bound_north[0], bound_west[0], 0])
@@ -76,7 +81,7 @@ class Path_Planner():
         spatial_index, airspace_geoms = self.create_idx(airspace_geo)
         city_spatial_index, city_geoms = self.create_idx(all_cities_geo)
 
-        shortest_path_length = 0
+        # shortest_path_length = 0
         shortest_path = []
         x, y, z = pm.geodetic2enu(p_s[0], p_s[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
         shortest_path.append(np.array([x/1000, y/1000]))
@@ -90,17 +95,21 @@ class Path_Planner():
 
 
         W, wind_direction = self.get_wind(u_wind['u'].values, v_wind['v'].values, new=True)
-        sfip = np.zeros(np.shape(W))
-        cape = np.zeros(np.shape(W))
-        brn = np.zeros(np.shape(W))
         smallest_time = 1
         max_weather_risk = 1e3
+        if long_range:
+          N = 200
+        else:
+          N = 100
 
         temp = self.rng.random((N, n_points, 3))
         temp_landmark = self.rng.random((N, n_points, 3))
         population = np.zeros((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
         velocity = self.rng.random((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
-        velocity_up = (range_max - range_min)*0.3
+        if long_range:
+          velocity_up = (range_max - range_min) * 0.4
+        else:
+          velocity_up = (range_max - range_min) * 0.2
         velocity_lo = -velocity_up
 
         all_x_penalties = []
@@ -117,7 +126,7 @@ class Path_Planner():
         p = population.copy()
         [constraint_violation, penalties, weather_penalties, ground_penalties] = (
                 self.get_fitness(population, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
         initial_penalties = (w_0 * np.sum(constraint_violation, axis=1) + w_1 * penalties[:, 0] + w_2 * penalties[:, 1] + w_3 * weather_penalties + w_4 * ground_penalties)
         g = np.min(initial_penalties)
         best_path = population[np.argmin(initial_penalties), :]
@@ -138,10 +147,10 @@ class Path_Planner():
 
             [x_constraint_violation, x_penalties, x_weather_penalties, x_ground_penalties] = (
                 self.get_fitness(new_population, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
             [p_constraint_violation, p_penalties, p_weather_penalties, p_ground_penalties] = (
                 self.get_fitness(p, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu))
+                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
 
             x_real_penalties = (w_0 * np.sum(x_constraint_violation, axis=1) +
                                 w_1 * (1-shortest_path_length/x_penalties[:, 0]) +
@@ -173,7 +182,7 @@ class Path_Planner():
         best_path[-1,2] = 0
 
         np.savetxt('./temp/path_coordinates.txt', best_path)
-        self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source)
+        self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range)
 
     def weather_data(self, year, month, day):
         clwmr = xr.open_dataset(f"data/{year + month + day}/CLMR.nc")
@@ -355,6 +364,11 @@ class Path_Planner():
     def load_airspace(self, bound_north, bound_west):
         file_path = './data/us_asp.txt'
 
+        if abs(bound_north[0]-bound_north[1]) > 8 or abs(bound_west[0]-bound_west[1]) > 8:
+            long_range = True
+        else:
+            long_range = False
+
         with open(file_path, "r") as file:
             lines = file.readlines()
 
@@ -374,9 +388,23 @@ class Path_Planner():
                 try:
                     alt = int(split_line[1][0:-2])
                 except:
-                        alt = 1e6
-                if line[3:6] == 'GND' or alt <= 1500:
-                    record = True
+                    alt = 1e6
+                if line[3:6] == 'GND' or alt <= 40000:  # 1500:
+                    try:
+                        temp_split = lines[i + 1].split(' ')
+                        alt_up = int(temp_split[1][0:-2])
+                    except:
+                        alt_up = 1e6
+                    if long_range:
+                        if alt_up >= 40000:
+                            record = True
+                        else:
+                            record = False
+                    else:
+                        if line[3:6] == 'GND' or (0 <= alt <= 2000 and alt_up <= 2000):
+                            record = True
+                        else:
+                            record = False
                 else:
                     record = False
             if record:
@@ -406,7 +434,7 @@ class Path_Planner():
             if airspace[0] != airspace[-1]:
                 inbound_airspace[i].append(airspace[0])
 
-        return inbound_airspace
+        return inbound_airspace, long_range
 
     def check_cylinders(self, p1, p2, cy_loc, cy_shape, ground_level, ground):
         temp = p2 - p1
@@ -559,7 +587,7 @@ class Path_Planner():
         return line_length, grid_pos-1, hvix
 
     def get_fitness(self, population, spatial_index, airspace_geoms, W, wind_direction, sfip, cape, brn, city_spatial_index, city_geoms,
-                    ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu):
+                    ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range):
         turn_angle = []
         constraint_violation = np.zeros((len(population), 4))
         penalties = []
@@ -599,7 +627,10 @@ class Path_Planner():
             count = self.check_airspace(population[i], spatial_index, airspace_geoms)
             # ground_penalties.append(
             #     self.check_cylinders(p1, p2, ground_risk_locations, ground_risk_shape, ground_level, True))
-            ground_penalties.append(self.check_ground(population[i], city_spatial_index, city_geoms, ground_level))
+            if not long_range:
+              ground_penalties.append(self.check_ground(population[i], city_spatial_index, city_geoms, ground_level))
+            else:
+              ground_penalties.append(0.0)
 
             constraint_violation[i, 2] += count
 
@@ -634,9 +665,9 @@ class Path_Planner():
                 if np.linalg.norm(loc_2 - loc_1) < 1e-6:
                     time_segment.append(1)
                 elif condition:
-                    # sfip_part = sfip[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
-                    # cape_part = cape[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
-                    # brn_part = brn[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+                    sfip_part = sfip[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+                    cape_part = cape[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
+                    brn_part = brn[grid_pos[0, 1:-1], grid_pos[1, 1:-1]] * line_segment_length
 
                     w_part = W[grid_pos[0], grid_pos[1]]
                     wind_direction_1 = wind_direction[grid_pos[0], grid_pos[1]]
@@ -656,7 +687,7 @@ class Path_Planner():
                     ground_speed = wind + airspeed
                     ground_speed = ground_speed[1:-1]
                     time_segment.append(line_segment_length / (1.85200 * np.sqrt(np.sum(np.square(ground_speed), axis=1))))
-                    # weather_segment += np.sum(sfip_part + cape_part + brn_part)
+                    weather_segment += np.sum(sfip_part + cape_part + brn_part)
                 else:
                     time_segment.append(1)
 
@@ -726,7 +757,7 @@ class Path_Planner():
         velocity = w*velocity + c1*rp*(p - population) + c2*rg*(g - population)
         return population+velocity
 
-    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source):
+    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range):
         fig, ax = plt.subplots(figsize=(8, 8))
         ax.set_xlim(xylims[0][0], xylims[0][1])
         ax.set_ylim(xylims[1][0], xylims[1][1])
@@ -745,9 +776,10 @@ class Path_Planner():
             geometry = LineString([(point[1], point[0]) for point in city])
             cities_gdf_list.append(gpd.GeoDataFrame(geometry=[geometry], crs="EPSG:4326"))
         
-        if cities_gdf_list:
-            cities_gdf = gpd.GeoDataFrame(pd.concat(cities_gdf_list, ignore_index=True), crs="EPSG:4326")
-            cities_gdf.plot(ax=ax, color='red')
+        if not long_range:
+          if cities_gdf_list:
+              cities_gdf = gpd.GeoDataFrame(pd.concat(cities_gdf_list, ignore_index=True), crs="EPSG:4326")
+              cities_gdf.plot(ax=ax, color='red')
         
         points = [(point[1], point[0]) for point in best_path]
         points_gdf = gpd.GeoDataFrame(geometry=[Point(xy) for xy in points], crs="EPSG:4326")
