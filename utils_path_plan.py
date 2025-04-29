@@ -24,9 +24,6 @@ class Path_Planner():
 
         u_wind = xr.open_dataset(f"./data/UGRD.nc", decode_timedelta=False)
         v_wind = xr.open_dataset(f"./data/VGRD.nc", decode_timedelta=False)
-        
-        year = '2020'; month = '12'; day = '29'
-        sfip, cape, brn = self.weather_data(year, month, day)
 
         w_0 = 10 # constraint penalties
         w_1 = 1 # path distance
@@ -93,7 +90,8 @@ class Path_Planner():
         shortest_path = np.stack(shortest_path)
         shortest_path_length = np.sum(np.sqrt(np.sum(np.square(shortest_path[1:, :] - shortest_path[0:-1]), axis=1)))
 
-
+        year = '2025'; month = '02'; day = '15'
+        sfip, cape, brn = self.weather_data(year, month, day, long_range)
         W, wind_direction = self.get_wind(u_wind['u'].values, v_wind['v'].values, new=True)
         smallest_time = 1
         max_weather_risk = 1e3
@@ -184,18 +182,22 @@ class Path_Planner():
         np.savetxt('./temp/path_coordinates.txt', best_path)
         self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range)
 
-    def weather_data(self, year, month, day):
-        clwmr = xr.open_dataset(f"data/{year + month + day}/CLMR.nc")
-        cice = xr.open_dataset(f"data/{year + month + day}/CIMIXR.nc")
-        spfh = xr.open_dataset(f"data/{year + month + day}/SPFH.nc")
-        rwmr = xr.open_dataset(f"data/{year + month + day}/RWMR.nc")
-        snmr = xr.open_dataset(f"data/{year + month + day}/SNMR.nc")
-        rh = xr.open_dataset(f"data/{year + month + day}/RH.nc")['r'].values
-        vvel = xr.open_dataset(f"data/{year + month + day}/VVEL.nc")['w'].values
-        t = xr.open_dataset(f"data/{year + month + day}/TMP.nc")['t'].values - 273.15
-        cape = xr.open_dataset(f"data/{year + month + day}/CAPE.nc")['cape'].values
-        vucsh = xr.open_dataset(f"data/{year + month + day}/VUCSH.nc")['vucsh'].values
-        vvcsh = xr.open_dataset(f"data/{year + month + day}/VVCSH.nc")['vvcsh'].values
+    def weather_data(self, year, month, day, long_range):
+        if long_range:
+            data_dir = f"data/{year + month + day}/250 mb"
+        else:
+            data_dir = f"data/{year + month + day}"
+        clwmr = xr.open_dataset(f"{data_dir}/CLMR.nc")
+        cice = xr.open_dataset(f"{data_dir}/CIMIXR.nc")
+        spfh = xr.open_dataset(f"{data_dir}/SPFH.nc")
+        rwmr = xr.open_dataset(f"{data_dir}/RWMR.nc")
+        snmr = xr.open_dataset(f"{data_dir}/SNMR.nc")
+        rh = xr.open_dataset(f"{data_dir}/RH.nc")['r'].values
+        vvel = xr.open_dataset(f"{data_dir}/VVEL.nc")['w'].values
+        t = xr.open_dataset(f"{data_dir}/TMP.nc")['t'].values - 273.15
+        cape = xr.open_dataset(f"{data_dir}/CAPE.nc")['cape'].values
+        vucsh = xr.open_dataset(f"{data_dir}/VUCSH.nc")['vucsh'].values
+        vvcsh = xr.open_dataset(f"{data_dir}/VVCSH.nc")['vvcsh'].values
 
         m_rh = copy.copy(rh)
         m_t = copy.copy(t)
