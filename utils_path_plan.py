@@ -12,8 +12,7 @@ import ast
 from rtree import index
 from pyproj import Transformer
 import contextily as ctx
-
-
+from herbie import Herbie
 
 
 class Path_Planner():
@@ -22,8 +21,37 @@ class Path_Planner():
 
     def plan_path(self, file_path, n_generation, xylims, map_source):
 
-        u_wind = xr.open_dataset(f"./data/UGRD.nc", decode_timedelta=False)
-        v_wind = xr.open_dataset(f"./data/VGRD.nc", decode_timedelta=False)
+        # u_wind = xr.open_dataset(f"./data/UGRD.nc", decode_timedelta=False)
+        # v_wind = xr.open_dataset(f"./data/VGRD.nc", decode_timedelta=False)
+        year = '2025'; month = '02'; day = '15'
+        H = Herbie(
+            f'{year}-{month}-{day}',
+            model="hrrr",
+            product="prs",
+            fxx=0,
+        )
+        sample_weather = H.xarray(f"VGRD:{'250 mb'}")
+
+        with open(file_path, "r") as file:
+            lines = file.readlines()
+
+        path_latitude = []
+        path_longitude = []
+        for i in lines:
+          path_latitude.append(list(map(float, i.split(' ')))[0])
+          path_longitude.append(list(map(float, i.split(' ')))[1])
+
+        # Based on mission's bound
+        bound_north = [max(sample_weather['latitude'].values[0, 0], min(path_latitude) - 1),
+                 min(sample_weather['latitude'].values[-1, 0] - 2.5, max(path_latitude) + 1)]
+        bound_west = [max((sample_weather['longitude'].values[0, 0] + 180) % 360 - 180, min(path_longitude) - 1),
+                min((sample_weather['longitude'].values[0, -1] + 180) % 360 - 180, max(path_longitude) + 1)]
+        if abs(bound_north[0]-bound_north[1]) > 8 or abs(bound_west[0]-bound_west[1]) > 8:
+            long_range = True
+        else:
+            long_range = False
+
+        sfip, cape, brn, u_wind, v_wind = self.weather_data(year, month, day, long_range)
 
         w_0 = 10 # constraint penalties
         w_1 = 1 # path distance
@@ -37,15 +65,6 @@ class Path_Planner():
         # offset_x = 1070
         # offset_y = -70
 
-        with open(file_path, "r") as file:
-            lines = file.readlines()
-
-        path_latitude = []
-        path_longitude = []
-        for i in lines:
-          path_latitude.append(list(map(float, i.split(' ')))[0])
-          path_longitude.append(list(map(float, i.split(' ')))[1])
-
         p_s = np.array(list(map(float, lines[0].split(' '))))
         p_e = np.array(list(map(float, lines[-1].split(' '))))
         land_mark = []
@@ -56,15 +75,9 @@ class Path_Planner():
         else:
             max_ground_risk = 10*len(land_mark)
 
-        # Based on mission's bound
-        bound_north = [max(u_wind['latitude'].values[0, 0], min(path_latitude) - 1),
-                       min(u_wind['latitude'].values[-1, 0] - 2.5, max(path_latitude) + 1)]
-        bound_west = [max((u_wind['longitude'].values[0, 0] + 180) % 360 - 180, min(path_longitude) - 1),
-                      min((u_wind['longitude'].values[0, -1] + 180) % 360 - 180, max(path_longitude) + 1)]
-
         left_bottom_corner = [u_wind['latitude'].values[0, 0], ((u_wind['longitude'].values[0, 0]+180)%360)-180]
 
-        airspace_geo, long_range = self.load_airspace(bound_north, bound_west)
+        airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
         all_cities_geo, ground_level = self.load_cities(bound_west)
         # land_mark, p_s, p_e, all_cities, airspace, range_min, range_max = self.prep_loc(left_bottom_corner, all_cities_geo, p_s, p_e, land_mark, airspace_geo, bound_north, bound_west)
         range_min = np.array([bound_north[0], bound_west[0], 0])
@@ -90,8 +103,6 @@ class Path_Planner():
         shortest_path = np.stack(shortest_path)
         shortest_path_length = np.sum(np.sqrt(np.sum(np.square(shortest_path[1:, :] - shortest_path[0:-1]), axis=1)))
 
-        year = '2025'; month = '02'; day = '15'
-        sfip, cape, brn = self.weather_data(year, month, day, long_range)
         W, wind_direction = self.get_wind(u_wind['u'].values, v_wind['v'].values, new=True)
         smallest_time = 1
         max_weather_risk = 1e3
@@ -183,21 +194,31 @@ class Path_Planner():
         self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range)
 
     def weather_data(self, year, month, day, long_range):
+
+        H = Herbie(
+            f'{year}-{month}-{day}',
+            model="hrrr",
+            product="prs",
+            fxx=0,
+        )
+
         if long_range:
-            data_dir = f"data/{year + month + day}/250 mb"
+            altitude = '950 mb'
         else:
-            data_dir = f"data/{year + month + day}"
-        clwmr = xr.open_dataset(f"{data_dir}/CLMR.nc")
-        cice = xr.open_dataset(f"{data_dir}/CIMIXR.nc")
-        spfh = xr.open_dataset(f"{data_dir}/SPFH.nc")
-        rwmr = xr.open_dataset(f"{data_dir}/RWMR.nc")
-        snmr = xr.open_dataset(f"{data_dir}/SNMR.nc")
-        rh = xr.open_dataset(f"{data_dir}/RH.nc")['r'].values
-        vvel = xr.open_dataset(f"{data_dir}/VVEL.nc")['w'].values
-        t = xr.open_dataset(f"{data_dir}/TMP.nc")['t'].values - 273.15
-        cape = xr.open_dataset(f"{data_dir}/CAPE.nc")['cape'].values
-        vucsh = xr.open_dataset(f"{data_dir}/VUCSH.nc")['vucsh'].values
-        vvcsh = xr.open_dataset(f"{data_dir}/VVCSH.nc")['vvcsh'].values
+            altitude = '250 mb'
+        clwmr = H.xarray(f"CLMR:{altitude}")  # Cloud Mixing Ratio [kg/kg]
+        cice = H.xarray(f"CIMIXR:{altitude}")  # Cloud Ice Mixing Ratio [kg/kg]
+        spfh = H.xarray(f"SPFH:{altitude}")  # Specific Humidity [kg/kg]
+        rwmr = H.xarray(f"RWMR:{altitude}")  # Rain Mixing Ratio [kg/kg]
+        snmr = H.xarray(f"SNMR:{altitude}")  # Snow Mixing Ratio [kg/kg]
+        t = H.xarray(f"TMP:{altitude}")  # Temperature [K]
+        rh = H.xarray(f"RH:{altitude}")  # Relative Humidity [%]
+        vvel = H.xarray(f"VVEL:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
+        cape = H.xarray("CAPE:255-0 mb above ground")  # Vertical Velocity (Pressure) [Pa/s]
+        vucsh = H.xarray("VUCSH:0-6000 m above ground")  # Vertical Velocity (Pressure) [Pa/s]
+        vvcsh = H.xarray("VVCSH:0-6000 m above ground")  # Vertical Velocity (Pressure) [Pa/s]
+        ugrd = H.xarray(f"UGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
+        vgrd = H.xarray(f"VGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
 
         m_rh = copy.copy(rh)
         m_t = copy.copy(t)
@@ -244,7 +265,7 @@ class Path_Planner():
         sfip = m_t * (alpha*m_rh + beta*m_vvel + gamma*m_lwc)
         sfip[sfip < 0] = 0
 
-        return sfip, m_cape, m_brn
+        return sfip, m_cape, m_brn, ugrd, vgrd
     
     def create_idx(self, object):
         spatial_index = index.Index()
