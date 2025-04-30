@@ -16,3 +16,4 @@ rtree==1.4.0
 pyproj==3.7.1
 matplotlib==3.10.1
 ortools==9.12.4544
+herbie-data==2025.3.1
