@@ -141,7 +141,7 @@ class Path_Planner():
         best_path = population[np.argmin(initial_penalties), :]
 
         for i in range(n_generation+1):
-            velocity *= -1/n_generation*i + 1
+            velocity *= -5/n_generation*i + 1
             new_population = self.update_population(population, velocity, p, best_path)
             for j, one_land_mark in enumerate(land_mark):
                 new_population[:, int((n_points+1)*(j+1)), :] = one_land_mark
@@ -211,12 +211,12 @@ class Path_Planner():
         spfh = H.xarray(f"SPFH:{altitude}")  # Specific Humidity [kg/kg]
         rwmr = H.xarray(f"RWMR:{altitude}")  # Rain Mixing Ratio [kg/kg]
         snmr = H.xarray(f"SNMR:{altitude}")  # Snow Mixing Ratio [kg/kg]
-        t = H.xarray(f"TMP:{altitude}")  # Temperature [K]
-        rh = H.xarray(f"RH:{altitude}")  # Relative Humidity [%]
-        vvel = H.xarray(f"VVEL:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
-        cape = H.xarray("CAPE:255-0 mb above ground")  # Vertical Velocity (Pressure) [Pa/s]
-        vucsh = H.xarray("VUCSH:0-6000 m above ground")  # Vertical Velocity (Pressure) [Pa/s]
-        vvcsh = H.xarray("VVCSH:0-6000 m above ground")  # Vertical Velocity (Pressure) [Pa/s]
+        t = (H.xarray(f"TMP:{altitude}"))['t'].values - 273.15  # Temperature [K]
+        rh = (H.xarray(f"RH:{altitude}"))['r'].values  # Relative Humidity [%]
+        vvel = (H.xarray(f"VVEL:{altitude}"))['w'].values  # Vertical Velocity (Pressure) [Pa/s]
+        cape = (H.xarray("CAPE:255-0 mb above ground"))['cape'].values  # Vertical Velocity (Pressure) [Pa/s]
+        vucsh = (H.xarray("VUCSH:0-6000 m above ground"))['vucsh'].values  # Vertical Velocity (Pressure) [Pa/s]
+        vvcsh = (H.xarray("VVCSH:0-6000 m above ground"))['vvcsh'].values  # Vertical Velocity (Pressure) [Pa/s]
         ugrd = H.xarray(f"UGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
         vgrd = H.xarray(f"VGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
 
@@ -384,13 +384,8 @@ class Path_Planner():
 
         return land_mark, p_s, p_e, np.stack(range_min), np.stack(range_max)
 
-    def load_airspace(self, bound_north, bound_west):
+    def load_airspace(self, bound_north, bound_west, long_range):
         file_path = './data/us_asp.txt'
-
-        if abs(bound_north[0]-bound_north[1]) > 8 or abs(bound_west[0]-bound_west[1]) > 8:
-            long_range = True
-        else:
-            long_range = False
 
         with open(file_path, "r") as file:
             lines = file.readlines()
@@ -457,7 +452,7 @@ class Path_Planner():
             if airspace[0] != airspace[-1]:
                 inbound_airspace[i].append(airspace[0])
 
-        return inbound_airspace, long_range
+        return inbound_airspace
 
     def check_cylinders(self, p1, p2, cy_loc, cy_shape, ground_level, ground):
         temp = p2 - p1

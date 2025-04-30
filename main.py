@@ -282,7 +282,7 @@ class ChatbotApp(QMainWindow):
         central_widget.setLayout(final_layout)
         
         self.messages = [{"role": "system", "content": self.route_planner.system_prompt}]
-        self.n_generation = 1
+        self.n_generation = 100
     
     def choose_model(self, button_id):
         self.mode = self.nav_symbols[button_id][1]
