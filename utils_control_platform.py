@@ -267,7 +267,7 @@ CONNECTION_URL = "http://127.0.0.1:5001"
 USERNAME = "Admin"
 PASSWORD = "Distributed"
 
-input_file = "path_figures/200th_generation.txt"
+
 mission_file = "mission.json"
 
 
@@ -471,7 +471,7 @@ def set_auto_mode_for_sim(platform_ID, headers):
     print("Mission Started!")
 
 
-def execute_pipeline():
+def execute_pipeline(input_file):
 # Get authentication token
     print("Getting Token...")
     payload = {"username": USERNAME, "password": PASSWORD }

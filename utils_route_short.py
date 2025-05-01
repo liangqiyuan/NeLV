@@ -221,10 +221,7 @@ Output must be valid JSON with structure:
             for idx in route:
                 point = mission_data[idx]
                 all_points.append([point['latitude'], point['longitude'], 0])
-                # all_points.append([int(route_id), point['latitude'], point['longitude'], 0])
-        
-        points_array = np.array(all_points)
-        np.savetxt(self.filename, points_array)
+            np.savetxt(f"./temp/route_coordinates_{route_id}.txt", all_points)
 
     def plan_route(self, planned_flight):
         for key in self.default_flight:
@@ -243,8 +240,6 @@ Output must be valid JSON with structure:
         routes = self.find_optimal_route(mission_data, planned_flight['number_uavs'])
         print(routes)
         self.plot_routes(mission_data, routes)
-
-        self.filename = "./temp/route_coordinates.txt"
         self.save_route_to_txt(mission_data, routes)
 
 

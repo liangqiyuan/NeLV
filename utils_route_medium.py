@@ -272,12 +272,11 @@ Output must be valid JSON with structure:
         plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0)
 
     def save_route_to_txt(self, mission_data, route):
-        ordered_points = []
+        all_points = []
         for idx in route:
             point = mission_data[idx]
-            ordered_points.append([point['latitude'], point['longitude'], 0])
-        points_array = np.array(ordered_points)
-        np.savetxt(self.filename, points_array)
+            all_points.append([point['latitude'], point['longitude'], 0])
+        np.savetxt(f"./temp/route_coordinates.txt", all_points)
 
     def plan_route(self, planned_flight):
         for key in self.default_flight:
@@ -301,8 +300,6 @@ Output must be valid JSON with structure:
         route = self.MSGS(graph)
         print(route)
         self.plot_routes(mission_data, route, start_idx, end_idx)
-
-        self.filename = "./temp/route_coordinates.txt"
         self.save_route_to_txt(mission_data, route)
 
     

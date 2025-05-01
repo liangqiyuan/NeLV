@@ -1,4 +1,4 @@
-import sys, re
+import sys, os, glob, shutil
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPainter, QPixmap, QRegion, QPainterPath, QIcon, QFont, QFontMetrics, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer, QThread, QRectF, QSize
@@ -8,8 +8,7 @@ import numpy as np
 import json
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import warnings
-warnings.filterwarnings('ignore', category=UserWarning)
-warnings.filterwarnings('ignore', category=RuntimeWarning)
+warnings.filterwarnings('ignore')
 
 from utils_route_short import *
 from utils_route_medium import *
@@ -156,7 +155,7 @@ class ChatbotApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("LLMAP")
         self.setWindowIcon(QIcon("icons/title_icon.png"))
-        self.setGeometry(1200, 600, 1000, 1150)
+        self.setGeometry(1000, 1000, 1000, 1150)
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -305,19 +304,31 @@ class ChatbotApp(QMainWindow):
             self.reset_chat()
 
         elif self.mode == "Plan Route":
+            for file in glob.glob('./temp/*route_coordinates*'):
+                os.remove(file)
             if not isinstance(self.route_planner, DummyChat):
                 self.route_planner.plan_route(self.planned_flight)
                 route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_route.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
                 self.chat_layout.addWidget(route_plot)
         elif self.mode == "Plan Path":
+            for file in glob.glob('./temp/*path_coordinates*'):
+                os.remove(file)
             if not isinstance(self.route_planner, DummyChat):
-                self.path_planner = Path_Planner()
-                self.path_planner.plan_path("temp/route_coordinates.txt", self.n_generation, self.route_planner.xylims, self.route_planner.map_source)
-                route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_path.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
-                self.chat_layout.addWidget(route_plot)
+                if isinstance(self.route_planner, ShortRoutePlanner):
+                    for file in glob.glob('./temp/*route_coordinates*'):
+                        new_file = file.replace('route_coordinates', 'path_coordinates')
+                        shutil.copy(file, new_file)
+                    route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_route.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
+                    self.chat_layout.addWidget(route_plot)
+                else:
+                    self.path_planner = Path_Planner()
+                    self.path_planner.plan_path("temp/route_coordinates.txt", self.n_generation, self.route_planner.xylims, self.route_planner.map_source)
+                    route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_path.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
+                    self.chat_layout.addWidget(route_plot)
         elif self.mode == "Upload Path":
             if not isinstance(self.route_planner, DummyChat):
-                execute_pipeline()
+                for file in glob.glob('./temp/*path_coordinates*'):
+                    execute_pipeline(file)
 
         elif self.mode == "Hist - Short Range":
             self.route_planner = ShortRoutePlanner()
