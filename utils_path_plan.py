@@ -57,141 +57,134 @@ class Path_Planner():
         w_1 = 1 # path distance
         w_2 = 0 # fuel consumption
         w_3 = 0.05 # weather
-        w_4 = 0.05 # ground risk
+        w_4 = 0.1 # ground risk
 
-        N = 100
+        N = 50
         n_points = 2
         cruise_h = 1000
-        # offset_x = 1070
-        # offset_y = -70
-
-        p_s = np.array(list(map(float, lines[0].split(' '))))
-        p_e = np.array(list(map(float, lines[-1].split(' '))))
-        land_mark = []
-        for i in range(1, len(lines)-1):
-            land_mark.append(np.array(list(map(float, lines[i].split(' ')))))
-        if len(land_mark)==0:
-            max_ground_risk = 10
-        else:
-            max_ground_risk = 10*len(land_mark)
-
+        all_best_path = []
         left_bottom_corner = [u_wind['latitude'].values[0, 0], ((u_wind['longitude'].values[0, 0]+180)%360)-180]
-
-        airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
-        all_cities_geo, ground_level = self.load_cities(bound_west)
-        # land_mark, p_s, p_e, all_cities, airspace, range_min, range_max = self.prep_loc(left_bottom_corner, all_cities_geo, p_s, p_e, land_mark, airspace_geo, bound_north, bound_west)
-        range_min = np.array([bound_north[0], bound_west[0], 0])
-        range_max = np.array([bound_north[1], bound_west[1], cruise_h])
-
-        x1, y1, z = pm.geodetic2enu(range_min[0], range_min[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
-        x2, y2, z = pm.geodetic2enu(range_max[0], range_max[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
-        bound_x_enu = np.arange(x1/1000, x2/1000, 3)
-        bound_y_enu = np.arange(y1/1000, y2/1000, 3)
-
-        spatial_index, airspace_geoms = self.create_idx(airspace_geo)
-        city_spatial_index, city_geoms = self.create_idx(all_cities_geo)
-
-        # shortest_path_length = 0
-        shortest_path = []
-        x, y, z = pm.geodetic2enu(p_s[0], p_s[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
-        shortest_path.append(np.array([x/1000, y/1000]))
-        for one_land_mark in land_mark:
-            x, y, z = pm.geodetic2enu(one_land_mark[0], one_land_mark[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
-            shortest_path.append(np.array([x/1000, y/1000]))
-        x, y, z = pm.geodetic2enu(p_e[0], p_e[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
-        shortest_path.append(np.array([x/1000, y/1000]))
-        shortest_path = np.stack(shortest_path)
-        shortest_path_length = np.sum(np.sqrt(np.sum(np.square(shortest_path[1:, :] - shortest_path[0:-1]), axis=1)))
-
+        max_ground_risk = 10
         W, wind_direction = self.get_wind(u_wind['u'].values, v_wind['v'].values, new=True)
-        smallest_time = 1
-        max_weather_risk = 1e3
-        if long_range:
-          N = 200
-        else:
-          N = 100
 
-        temp = self.rng.random((N, n_points, 3))
-        temp_landmark = self.rng.random((N, n_points, 3))
-        population = np.zeros((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
-        velocity = self.rng.random((N, int((len(land_mark)+1)*n_points+2+len(land_mark)), 3))
-        if long_range:
-          velocity_up = (range_max - range_min) * 0.4
-        else:
-          velocity_up = (range_max - range_min) * 0.2
-        velocity_lo = -velocity_up
+        for num_line in range(0, len(lines)-1):
+            p_s = np.array(list(map(float, lines[num_line].split(' '))))
+            p_e = np.array(list(map(float, lines[num_line+1].split(' '))))
 
-        all_x_penalties = []
-        all_x_constraint = []
+            # Based on mission's bound
+            small_bound_north = [max(sample_weather['latitude'].values[0, 0], min(path_latitude[num_line:(num_line+2)]) - 0.5),
+                           min(sample_weather['latitude'].values[-1, 0] - 2.5, max(path_latitude[num_line:(num_line+2)]) + 0.5)]
+            small_bound_west = [max((sample_weather['longitude'].values[0, 0] + 180) % 360 - 180, min(path_longitude[num_line:(num_line+2)]) - 0.5),
+                          min((sample_weather['longitude'].values[0, -1] + 180) % 360 - 180, max(path_longitude[num_line:(num_line+2)]) + 0.5)]
+            range_min = np.array([small_bound_north[0], small_bound_west[0], 0])
+            range_max = np.array([small_bound_north[1], small_bound_west[1], cruise_h])
 
-        for i in range(N):
-            temp_population = np.vstack((p_s, (range_max - range_min) * temp[i] + range_min))
-            for j in range(len(land_mark)):
-                temp_population = np.vstack((temp_population, land_mark[j], (range_max - range_min) * temp_landmark[i] + range_min))
-            population[i] = np.vstack((temp_population, p_e))
-            velocity[i] = (velocity_up-velocity_lo)*velocity[i]+velocity_lo
-        population[:, :, 2] = cruise_h
+            x1, y1, z = pm.geodetic2enu(range_min[0], range_min[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+            x2, y2, z = pm.geodetic2enu(range_max[0], range_max[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+            bound_x_enu = np.arange(x1/1000, x2/1000, 3)
+            bound_y_enu = np.arange(y1/1000, y2/1000, 3)
 
-        p = population.copy()
-        [constraint_violation, penalties, weather_penalties, ground_penalties] = (
-                self.get_fitness(population, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
-        initial_penalties = (w_0 * np.sum(constraint_violation, axis=1) + w_1 * penalties[:, 0] + w_2 * penalties[:, 1] + w_3 * weather_penalties + w_4 * ground_penalties)
-        g = np.min(initial_penalties)
-        best_path = population[np.argmin(initial_penalties), :]
+            airspace_geo = self.load_airspace(small_bound_north, small_bound_west, long_range)
+            all_cities_geo, ground_level = self.load_cities(small_bound_west)
 
-        for i in range(n_generation+1):
-            velocity *= -5/n_generation*i + 1
-            new_population = self.update_population(population, velocity, p, best_path)
-            for j, one_land_mark in enumerate(land_mark):
-                new_population[:, int((n_points+1)*(j+1)), :] = one_land_mark
-                p[:, int((n_points+1)*(j+1)), :] = one_land_mark
+            spatial_index, airspace_geoms = self.create_idx(airspace_geo)
+            city_spatial_index, city_geoms = self.create_idx(all_cities_geo)
 
-            new_population[:, :, 2] = cruise_h
-            new_population[:, 0, :] = p_s
-            new_population[:, -1, :] = p_e
-            p[:, :, 2] = cruise_h
-            p[:, 0, :] = p_s
-            p[:, -1, :] = p_e
+            shortest_path = []
+            x, y, z = pm.geodetic2enu(p_s[0], p_s[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+            shortest_path.append(np.array([x/1000, y/1000]))
+            x, y, z = pm.geodetic2enu(p_e[0], p_e[1], 0, left_bottom_corner[0], left_bottom_corner[1], 0)
+            shortest_path.append(np.array([x/1000, y/1000]))
+            shortest_path = np.stack(shortest_path)
+            shortest_path_length = np.sum(np.sqrt(np.sum(np.square(shortest_path[1:, :] - shortest_path[0:-1]), axis=1)))
 
-            [x_constraint_violation, x_penalties, x_weather_penalties, x_ground_penalties] = (
-                self.get_fitness(new_population, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
-            [p_constraint_violation, p_penalties, p_weather_penalties, p_ground_penalties] = (
-                self.get_fitness(p, spatial_index, airspace_geoms, W, wind_direction,
-                                    sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
+            smallest_time = 1
+            max_weather_risk = 1e3
 
-            x_real_penalties = (w_0 * np.sum(x_constraint_violation, axis=1) +
-                                w_1 * (1-shortest_path_length/x_penalties[:, 0]) +
-                                w_2 * (1-smallest_time/x_penalties[:, 1]) +
-                                w_3 * x_weather_penalties/max_weather_risk + w_4 * x_ground_penalties/max_ground_risk)
+            temp = self.rng.random((N, n_points, 3))
+            population = np.zeros((N, n_points+2, 3))
+            velocity = self.rng.random((N, n_points+2, 3))
+            if long_range:
+              velocity_up = (range_max - range_min) * 0.4
+            else:
+              velocity_up = (range_max - range_min) * 0.1
+            velocity_lo = -velocity_up
 
-            all_x_penalties.append(x_real_penalties)
-            all_x_constraint.append(np.sum(x_constraint_violation, axis=1))
-            p_real_penalties = (w_0 * np.sum(p_constraint_violation, axis=1) +
-                                w_1 * (1-shortest_path_length/p_penalties[:, 0]) +
-                                w_2 * (1-smallest_time/p_penalties[:, 1]) +
-                                w_3 * p_weather_penalties/max_weather_risk + w_4 * p_ground_penalties/max_ground_risk)
+            all_x_penalties = []
+            all_x_constraint = []
+
+            for i in range(N):
+                population[i] = np.vstack((p_s, (range_max - range_min) * temp[i] + range_min, p_e))
+                velocity[i] = (velocity_up-velocity_lo)*velocity[i]+velocity_lo
+            population[:, :, 2] = cruise_h
+
+            p = population.copy()
+            [constraint_violation, penalties, weather_penalties, ground_penalties] = (
+                    self.get_fitness(population, spatial_index, airspace_geoms, W, wind_direction,
+                                        sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
+            initial_penalties = (w_0 * np.sum(constraint_violation, axis=1) + w_1 * penalties[:, 0] + w_2 * penalties[:, 1] + w_3 * weather_penalties + w_4 * ground_penalties)
+            g = np.min(initial_penalties)
+            best_path = population[np.argmin(initial_penalties), :]
+
+            for i in range(n_generation+1):
+                velocity *= -0.5/n_generation*i + 1
+                new_population = self.update_population(population, velocity, p, best_path)
+
+                new_population[:, :, 2] = cruise_h
+                new_population[:, 0, :] = p_s
+                new_population[:, -1, :] = p_e
+                p[:, :, 2] = cruise_h
+                p[:, 0, :] = p_s
+                p[:, -1, :] = p_e
+
+                [x_constraint_violation, x_penalties, x_weather_penalties, x_ground_penalties] = (
+                    self.get_fitness(new_population, spatial_index, airspace_geoms, W, wind_direction,
+                                        sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
+                [p_constraint_violation, p_penalties, p_weather_penalties, p_ground_penalties] = (
+                    self.get_fitness(p, spatial_index, airspace_geoms, W, wind_direction,
+                                        sfip, cape, brn, city_spatial_index, city_geoms, ground_level, range_min, range_max, left_bottom_corner, bound_x_enu, bound_y_enu, long_range))
+
+                x_real_penalties = (w_0 * np.sum(x_constraint_violation, axis=1) +
+                                    w_1 * (1-shortest_path_length/x_penalties[:, 0]) +
+                                    w_2 * (1-smallest_time/x_penalties[:, 1]) +
+                                    w_3 * x_weather_penalties/max_weather_risk + w_4 * x_ground_penalties/max_ground_risk)
+
+                all_x_penalties.append(x_real_penalties)
+                all_x_constraint.append(np.sum(x_constraint_violation, axis=1))
+                p_real_penalties = (w_0 * np.sum(p_constraint_violation, axis=1) +
+                                    w_1 * (1-shortest_path_length/p_penalties[:, 0]) +
+                                    w_2 * (1-smallest_time/p_penalties[:, 1]) +
+                                    w_3 * p_weather_penalties/max_weather_risk + w_4 * p_ground_penalties/max_ground_risk)
 
 
-            idx = np.where(x_real_penalties <= p_real_penalties)
-            p[idx] = new_population[idx]
-            p_real_penalties[idx] = x_real_penalties[idx]
-            if np.any(p_real_penalties < g):
-                print('================================')
-                g = np.min(p_real_penalties)
-                best_path = p[np.argmin(p_real_penalties)]
-            if np.any(x_penalties[:, 0] < shortest_path_length):
-                raise Exception("Shorter than the shortest path!")
-            population = new_population.copy()
+                idx = np.where(x_real_penalties <= p_real_penalties)
+                p[idx] = new_population[idx]
+                p_real_penalties[idx] = x_real_penalties[idx]
+                if np.any(p_real_penalties < g):
+                    print('================================')
+                    g = np.min(p_real_penalties)
+                    best_path = p[np.argmin(p_real_penalties)]
+                if np.any(x_penalties[:, 0] < shortest_path_length):
+                    raise Exception("Shorter than the shortest path!")
+                population = new_population.copy()
 
-            print(f'Finished No.{i + 1} generation!')
+                print(f'Finished No.{i + 1} generation!')
+                # np.savetxt(f'./temp/path_coordinates_{num_line}_{i}.txt', best_path)
 
+            all_best_path.append(best_path[0:-1])
+
+        all_best_path.append(np.array(list(map(float, lines[-1].split(' ')))))
+        all_best_path = np.vstack(all_best_path)
         best_path[0,2] = 0
         best_path[-1,2] = 0
 
-        np.savetxt('./temp/path_coordinates.txt', best_path)
-        self.plot_path(best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range)
+        np.savetxt('./temp/path_coordinates.txt', all_best_path)
+        land_mark = []
+        for i in range(1, len(lines) - 1):
+            land_mark.append(np.array(list(map(float, lines[i].split(' ')))))
+        airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
+        all_cities_geo, ground_level = self.load_cities(bound_west)
+        self.plot_path(all_best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source)
 
     def weather_data(self, year, month, day, long_range):
 
@@ -386,7 +379,6 @@ class Path_Planner():
 
     def load_airspace(self, bound_north, bound_west, long_range):
         file_path = './data/us_asp.txt'
-
         with open(file_path, "r") as file:
             lines = file.readlines()
 
@@ -761,9 +753,6 @@ class Path_Planner():
     
 
     def update_population(self, population, velocity, p, g): # population:(N, n_points, 3)
-        # w = 0.7298
-        # c1 = 1.496
-        # c2 = 1.496
         w = 0.8
         c1 = 1.496
         c2 = 1.496
@@ -775,7 +764,7 @@ class Path_Planner():
         velocity = w*velocity + c1*rp*(p - population) + c2*rg*(g - population)
         return population+velocity
 
-    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, xylims, map_source, long_range):
+    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source):
         fig, ax = plt.subplots(figsize=(8, 8))
         ax.set_xlim(xylims[0][0], xylims[0][1])
         ax.set_ylim(xylims[1][0], xylims[1][1])
@@ -817,6 +806,7 @@ class Path_Planner():
                 way_point.plot(ax=ax, color='black', markersize=150, edgecolor='black', label='Mission Point', zorder=2)
 
         ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
-        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
+        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=10, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0)
+        plt.close()
