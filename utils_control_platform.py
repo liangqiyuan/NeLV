@@ -263,9 +263,12 @@ def createLocalCircuit(runway):
 
 # For this example we are connecting to a locally running Ground Control
 # Username and Password and generic, and purely used to get an Authentication Token
-CONNECTION_URL = "http://127.0.0.1:5001"
-USERNAME = "Admin"
-PASSWORD = "Distributed"
+# CONNECTION_URL = "http://127.0.0.1:5001"
+# USERNAME = "Admin"
+# PASSWORD = "Distributed"
+CONNECTION_URL = "https://cloud.distributed-avionics.com"
+USERNAME = "ChuhaoDeng"
+PASSWORD = "deng113_Platform"
 
 
 mission_file = "mission.json"
@@ -482,42 +485,42 @@ def execute_pipeline(input_file):
     # Create authorised header
     headers = {"Authorization": "Bearer "+ token}
 
-    response = requests.get(CONNECTION_URL + '/app/account/getPlatforms',headers=headers)
-    firstPlatformInfo = response.json()[0]
-    active_platform_ID = firstPlatformInfo["id"]
-    print("Found a platform with Id: %s" % active_platform_ID, "\n")
+    # response = requests.get(CONNECTION_URL + '/app/account/getPlatforms',headers=headers)
+    # firstPlatformInfo = response.json()[0]
+    # active_platform_ID = firstPlatformInfo["id"]
+    # print("Found a platform with Id: %s" % active_platform_ID, "\n")
 
 
     ####### STARTING SIMULATOR ##################
 
     # Start a simulator with the correct starting conditions
-    # sim_ID = start_sim(0, headers)
-    # time.sleep(1)
+    sim_ID = start_sim(0, headers)
+    time.sleep(1)
     
-    # print("Please wait for the Sims to start...")
+    print("Please wait for the Sims to start...")
     
     # Check to see if required simulators have started
-    # ready = False
-    # while not ready:
-    #     response = requests.get(CONNECTION_URL + '/app/Simulation/getSimulations', headers=headers)
-    #     response_dict = json.loads(response.text)
+    ready = False
+    while not ready:
+        response = requests.get(CONNECTION_URL + '/app/Simulation/getSimulations', headers=headers)
+        response_dict = json.loads(response.text)
     
-    #     active_platform_ID = "00000000-0000-0000-0000-000000000000"
-    #     active_sim_ID = ""
+        active_platform_ID = "00000000-0000-0000-0000-000000000000"
+        active_sim_ID = ""
     
-    #     active_platform_ID = response_dict[0]['platformId']
-    #     active_sim_ID = response_dict[0]['id']
+        active_platform_ID = response_dict[0]['platformId']
+        active_sim_ID = response_dict[0]['id']
         
-    #     # Sim will be given platform ID once fully initialised, this check ensure Sims are up and running before continuing
-    #     if active_platform_ID != "00000000-0000-0000-0000-000000000000":
-    #         ready = True
-    #         print("Platform IDs Started: " + str(active_platform_ID))
-    #     else:
-    #         ready = False
-    #     time.sleep(1)
+        # Sim will be given platform ID once fully initialised, this check ensure Sims are up and running before continuing
+        if active_platform_ID != "00000000-0000-0000-0000-000000000000":
+            ready = True
+            print("Platform IDs Started: " + str(active_platform_ID))
+        else:
+            ready = False
+        time.sleep(1)
     
-    # print("Sims Ready!")
-    # time.sleep(5) # some settling time for the simulators?
+    print("Sims Ready!")
+    time.sleep(5) # some settling time for the simulators?
 
     ####### SETTING AND GETTING A MISSION #######
 

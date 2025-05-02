@@ -1,0 +1,289 @@
+{
+  "platformId": "020d272e-b1e9-4c01-a4f4-98a8526ff928",
+  "waypoints": [
+    {
+      "index": 0,
+      "location": {
+        "latDeg": 40.41238491385427,
+        "lngDeg": -86.93711300504691,
+        "altM": 308
+      },
+      "type": "TakeOff"
+    },
+    {
+      "index": 1,
+      "location": {
+        "latDeg": 40.4133997437346,
+        "lngDeg": -86.94467392344387,
+        "altM": 358
+      },
+      "type": "Waypoint",
+      "commands": [
+        {
+          "commandType": "LandStart",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "location": {
+        "latDeg": 40.4222563145095,
+        "lngDeg": -86.94262258588122,
+        "altM": 408
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 3,
+      "location": {
+        "latDeg": 40.41787910841852,
+        "lngDeg": -86.91005030683635,
+        "altM": 533
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 4,
+      "location": {
+        "latDeg": 40.40902250139832,
+        "lngDeg": -86.9121012409761,
+        "altM": 533
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 5,
+      "location": {
+        "latDeg": 40.41367492419118,
+        "lngDeg": -86.92722842536479,
+        "altM": 533
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 6,
+      "location": {
+        "latDeg": 40.41324025322634,
+        "lngDeg": -86.94353357521649,
+        "altM": 533
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 7,
+      "location": {
+        "latDeg": 40.42209682400134,
+        "lngDeg": -86.94148224251738,
+        "altM": 533
+      },
+      "type": "Waypoint",
+      "commands": [
+        {
+          "commandType": "Jump",
+          "waypointIndex": 3,
+          "numRepeats": 0,
+          "index": 9
+        }
+      ]
+    },
+    {
+      "index": 8,
+      "location": {
+        "latDeg": 40.41771961793614,
+        "lngDeg": -86.90891004068662,
+        "altM": 388.5129404534082
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 9,
+      "location": {
+        "latDeg": 40.40886301091604,
+        "lngDeg": -86.91096096996606,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 10,
+      "location": {
+        "latDeg": 39.63464644569239,
+        "lngDeg": -86.35210784198307,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 11,
+      "location": {
+        "latDeg": 39.61748523944866,
+        "lngDeg": -86.36327808701864,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 12,
+      "location": {
+        "latDeg": 39.6023,
+        "lngDeg": -86.3732,
+        "altM": 336.105161170367
+      },
+      "type": "LoiterTurns",
+      "numTurns": 5,
+      "radiusM": 30
+    },
+    {
+      "index": 13,
+      "location": {
+        "latDeg": 39.7166936897768,
+        "lngDeg": -86.39672925738016,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 14,
+      "location": {
+        "latDeg": 39.74939496930666,
+        "lngDeg": -86.39225309095615,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 15,
+      "location": {
+        "latDeg": 39.761533,
+        "lngDeg": -86.387513,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 16,
+      "location": {
+        "latDeg": 39.86785824065649,
+        "lngDeg": -86.4868326061068,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 17,
+      "location": {
+        "latDeg": 40.335131026705746,
+        "lngDeg": -86.8770892416749,
+        "altM": 336.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 18,
+      "location": {
+        "latDeg": 39.758781817503525,
+        "lngDeg": -84.83432054002414,
+        "altM": 521
+      },
+      "type": "Waypoint",
+      "commands": [
+        {
+          "commandType": "LandStart",
+          "index": 1
+        }
+      ]
+    },
+    {
+      "index": 19,
+      "location": {
+        "latDeg": 39.766570024251656,
+        "lngDeg": -84.84017049489427,
+        "altM": 571
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 20,
+      "location": {
+        "latDeg": 39.75397606910189,
+        "lngDeg": -84.8685360806682,
+        "altM": 696
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 21,
+      "location": {
+        "latDeg": 39.74618756878628,
+        "lngDeg": -84.86268785674041,
+        "altM": 696
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 22,
+      "location": {
+        "latDeg": 39.75449897160138,
+        "lngDeg": -84.85068013618661,
+        "altM": 696
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 23,
+      "location": {
+        "latDeg": 39.75833660483975,
+        "lngDeg": -84.83531212598439,
+        "altM": 696
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 24,
+      "location": {
+        "latDeg": 39.7661248115902,
+        "lngDeg": -84.8411620430268,
+        "altM": 696
+      },
+      "type": "Waypoint",
+      "commands": [
+        {
+          "commandType": "Jump",
+          "waypointIndex": 20,
+          "numRepeats": 0,
+          "index": 9
+        }
+      ]
+    },
+    {
+      "index": 25,
+      "location": {
+        "latDeg": 39.75353085649499,
+        "lngDeg": -84.8695274454616,
+        "altM": 551.5129404534082
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 26,
+      "location": {
+        "latDeg": 39.745742356181715,
+        "lngDeg": -84.86367925932296,
+        "altM": 499.105161170367
+      },
+      "type": "Waypoint"
+    },
+    {
+      "index": 27,
+      "location": {
+        "latDeg": 39.753610071938986,
+        "lngDeg": -84.8459508625068,
+        "altM": 346
+      },
+      "type": "Land",
+      "abortHeightM": 50
+    }
+  ],
+  "forceWrite": true
+}
