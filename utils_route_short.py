@@ -133,7 +133,7 @@ Output must be valid JSON with structure:
         return routes
 
     def plot_routes(self, mission_data, routes):
-        fig, ax = plt.subplots(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(10, 10))
         mission_df = pd.DataFrame(mission_data)
         mission_df['type'] = ['Start' if i == 0 else 'Mission' for i in range(len(mission_data))]
         geometry = [Point(p['longitude'], p['latitude']) for p in mission_data]
@@ -213,7 +213,7 @@ Output must be valid JSON with structure:
         ctx.add_basemap(ax, crs=mission_gdf.crs, source=self.map_source)
         # ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
         plt.axis('off')
-        plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0)
+        plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0, dpi=150)
     
     def save_route_to_txt(self, mission_data, routes):
         all_points = []

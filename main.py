@@ -2,7 +2,7 @@ import sys, os, glob, shutil
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtGui import QPainter, QPixmap, QRegion, QPainterPath, QIcon, QFont, QFontMetrics, QColor, QPen
 from PyQt5.QtCore import Qt, QTimer, QThread, QRectF, QSize
-from PyQt5.QtWidgets import QFrame, QApplication, QMainWindow, QLineEdit, QPushButton, QButtonGroup, QVBoxLayout, QWidget, QLabel, QSizePolicy, QHBoxLayout, QScrollArea, QGraphicsDropShadowEffect
+from PyQt5.QtWidgets import QFrame, QGridLayout, QSpacerItem, QApplication, QMainWindow, QLineEdit, QPushButton, QButtonGroup, QVBoxLayout, QWidget, QLabel, QSizePolicy, QHBoxLayout, QScrollArea, QGraphicsDropShadowEffect
 
 import numpy as np
 import json
@@ -43,14 +43,14 @@ class ChatBubble(QWidget):
 
         outer_layout = QVBoxLayout()
         outer_layout.setContentsMargins(0, 0, 0, 0)
-
         title_layout = QHBoxLayout()
         title_layout.setContentsMargins(0, 0, 0, 0)
+        bubble_layout = QHBoxLayout()
+        bubble_layout.setContentsMargins(0, 0, 0, 0)
 
         title_label = QLabel(title)
         title_label.setObjectName("title")
-        title_label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 30px; color: black;")
-
+        title_label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 26px; color: black;")
         icon_label = QLabel()
         icon_label.setFixedSize(40, 40)
 
@@ -65,25 +65,27 @@ class ChatBubble(QWidget):
             title_layout.addWidget(title_label)
             title_layout.addStretch()
 
-        bubble_layout = QHBoxLayout()
-        bubble_layout.setContentsMargins(0, 0, 0, 0)
-
         label = QLabel()
         label.setText(text)
 
-        label.setMaximumWidth(max_width)
+        font_metrics = QFontMetrics(QFont("Comic Sans MS", 20))
+        text_width = font_metrics.horizontalAdvance(text)
+        
         label.setWordWrap(True)
-        label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         label.setTextFormat(Qt.PlainText)
 
         if is_user:
-            label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 24px; background-color: rgb(224, 244, 218); border-radius: 15px; color: black; border: 2px solid rgb(53, 105, 32); padding: 8px 16px;")
+            label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 26px; background-color: rgb(224, 244, 218); border-radius: 15px; color: black; border: 2px solid rgb(53, 105, 32); padding: 8px 16px;")
             label.setAlignment(Qt.AlignJustify)
-            bubble_layout.addStretch()
+            print(text_width)
+            left_space = min(int(max_width - text_width), int(max_width * 0.7)) if text_width <= max_width * 0.7 else int(max_width * 0.3)
+            spacer_left = QSpacerItem(left_space, 10, QSizePolicy.Fixed, QSizePolicy.Minimum)
+            bubble_layout.addSpacerItem(spacer_left)
             bubble_layout.addWidget(label)
         else:
-            label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 24px; background-color: rgb(224, 224, 224); border-radius: 15px; color: black; border: 2px solid black; padding: 8px 16px;")
+            label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 26px; background-color: rgb(224, 224, 224); border-radius: 15px; color: black; border: 2px solid black; padding: 8px 16px;")
             label.setAlignment(Qt.AlignJustify)
             bubble_layout.addWidget(label)
             bubble_layout.addStretch()
@@ -91,8 +93,6 @@ class ChatBubble(QWidget):
         outer_layout.addLayout(title_layout)
         outer_layout.addLayout(bubble_layout)
         self.setLayout(outer_layout)
-
-        self.label = label
         
 class ChatWidget(QWidget):
     def __init__(self, parent=None):
@@ -155,7 +155,7 @@ class ChatbotApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("LLMAP")
         self.setWindowIcon(QIcon("icons/title_icon.png"))
-        self.setGeometry(1000, 1000, 1000, 1150)
+        self.setGeometry(1400, 600, 1000, 1000)
         
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -235,6 +235,8 @@ class ChatbotApp(QMainWindow):
                 button = QPushButton(symbol); button.setFixedSize(50, 50)
                 if tooltip in ["Reset"]:
                     nav_layout.addStretch()
+                    separator = QWidget(); separator.setFixedHeight(1); separator.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed); separator.setStyleSheet("background-color: rgba(0, 0, 0, 50);")
+                    nav_layout.addWidget(separator)
                     button.setStyleSheet(""" QPushButton { font-family: 'Segoe UI Emoji'; font-size: 18px; border: none; border-radius: 10px; background-color: transparent; }
                                         QPushButton:hover { background-color: rgb(240, 128, 128); } 
                                         QPushButton:pressed { background-color: rgb(220, 20, 60); } """)
@@ -387,7 +389,7 @@ class ChatbotApp(QMainWindow):
         pipe = pipeline("text-generation", model=LLM_model, tokenizer=LLM_tokenizer,)
         generation_args = {"max_new_tokens": 512, "return_full_text": False, "temperature": 0.0, "do_sample": False, }
         response = pipe(self.messages, **generation_args)[0]['generated_text']
-        # self.messages.append({"role": "assistant", "content": f"{response.strip().rstrip("\n")}\n\n"})
+        self.messages.append({"role": "assistant", "content": f"{response.strip().rstrip("\n")}\n\n"})
         return response
     
     def load_response(self, response):
@@ -415,8 +417,7 @@ class ChatbotApp(QMainWindow):
                 self.planned_flight = self.route_planner.default_flight
 
     def send_message(self):
-        window_width = self.width()
-        max_bubble_width = int(window_width)
+        max_bubble_width = int(self.width())
         user_input = self.text_input.text().strip()
 
         u_msg = ChatBubble(user_input, True, "User", max_bubble_width)
