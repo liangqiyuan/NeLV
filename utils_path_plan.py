@@ -765,7 +765,7 @@ class Path_Planner():
         return population+velocity
 
     def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source):
-        fig, ax = plt.subplots(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_xlim(xylims[0][0], xylims[0][1])
         ax.set_ylim(xylims[1][0], xylims[1][1])
 
@@ -808,5 +808,5 @@ class Path_Planner():
         ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
         ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=10, fancybox=True, shadow=True)
         plt.axis('off')
-        plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0)
+        plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0, dpi=150)
         plt.close()

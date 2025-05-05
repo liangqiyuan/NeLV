@@ -130,7 +130,7 @@ Output must be valid JSON with structure:
         }
 
     def plot_routes(self, airports_df, routes, start_idx, end_idx):
-        fig, ax = plt.subplots(figsize=(8, 8))
+        fig, ax = plt.subplots(figsize=(10, 10))
         airports_gdf = gpd.GeoDataFrame(airports_df, geometry=gpd.points_from_xy(airports_df['longitude'], airports_df['latitude']), crs="EPSG:4326")
         
         x_min, y_min, x_max, y_max = airports_gdf.geometry.total_bounds
@@ -178,7 +178,7 @@ Output must be valid JSON with structure:
         ctx.add_basemap(ax, crs=airports_gdf.crs, source=self.map_source)
         ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=16, fancybox=True, shadow=True)
         plt.axis('off')
-        plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0)
+        plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0, dpi=150)
     
     def save_route_to_txt(self, mission_data, route):
         all_points = []
