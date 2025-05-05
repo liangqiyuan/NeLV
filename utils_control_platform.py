@@ -366,14 +366,27 @@ KEVV_360_runway = {
             "traffic_pattern": 'Left'
         } # Evansville
 
+KIND_50_runway = {
+            "lat": 39.71735330835, 
+            "lng": -86.30684189165,
+            "alt": 116.7,
+            "heading": 50,
+            "traffic_pattern": 'Left'
+        } # Indy
+
 def create_json(input_file, mission_file, starting_idx):    
     with open(input_file, 'r') as file:
         lines = file.readlines()
+
+    all_latitude = []
+    all_longitude = []
 
     # Parse the data
     waypoints = []
     for i, line in enumerate(lines):
         lat, lon, alt = map(float, line.split())
+        all_latitude.append(lat)
+        all_longitude.append(lon)
         
         if i == 0:
             waypoint_type = "TakeOff"
@@ -415,7 +428,12 @@ def create_json(input_file, mission_file, starting_idx):
 
     print(f"{mission_file} file has been created successfully.")
     time.sleep(3)
-    return i + starting_idx
+    if abs(min(all_latitude) - max(all_latitude)) > 8 or abs(min(all_longitude) - max(all_longitude)) > 8:
+        long_range = True
+    else:
+        long_range = False
+
+    return i + starting_idx, long_range
 
 
 def start_sim(sim_number, headers):
@@ -475,6 +493,8 @@ def set_auto_mode_for_sim(platform_ID, headers):
 
 
 def execute_pipeline(input_file):
+
+
 # Get authentication token
     print("Getting Token...")
     payload = {"username": USERNAME, "password": PASSWORD }
@@ -525,30 +545,53 @@ def execute_pipeline(input_file):
     ####### SETTING AND GETTING A MISSION #######
 
     # CHANGE TAKEOFF AIRPORT HERE
-    take_off_circuit = createLocalCircuit(KLAF_280_runway)
+    take_off_circuit = createLocalCircuit(KLAF_050_runway)
     starting_idx = len(take_off_circuit) - 2
     
         # Create json file from txt
-    ending_idx = create_json(input_file=input_file, mission_file=mission_file, starting_idx=starting_idx) - 1
+    ending_idx, long_range = create_json(input_file=input_file, mission_file=mission_file, starting_idx=starting_idx) - 1
 
-    # CHANGE LANDING AIRPORT HERE
-    land_circuit = createLocalCircuit(KRID_60_runway) # Richmond: KRID
+    if not long_range:
+        # CHANGE LANDING AIRPORT HERE
+        take_off_circuit = createLocalCircuit(KIND_50_runway)
+        land_circuit = createLocalCircuit(KLAF_050_runway) # Richmond: KRID
 
-    for i, waypoint in enumerate(land_circuit):
-        waypoint["index"] = i + ending_idx
+        for i, waypoint in enumerate(land_circuit):
+            waypoint["index"] = i + ending_idx
 
-    # Set mission using token
-    print("Setting Mission...")
-    with open(f'{mission_file}', 'r') as f:
-        data = json.load(f)
+        # Set mission using token
+        print("Setting Mission...")
+        with open(f'{mission_file}', 'r') as f:
+            data = json.load(f)
 
-    payload = {
-                "platformId": active_platform_ID,
-                "waypoints": take_off_circuit[:-1] + data["waypoints"][1: -1] + land_circuit[1:],
-                "forceWrite": True
-            }    
-    
-    payload["waypoints"][-4]["commands"][0]["waypointIndex"] = payload["waypoints"][-4]["index"] - 4
+        payload = {
+                    "platformId": active_platform_ID,
+                    "waypoints": take_off_circuit[:-1] + data["waypoints"][1: -1] + land_circuit[1:],
+                    "forceWrite": True
+                }    
+        
+        payload["waypoints"][-4]["commands"][0]["waypointIndex"] = payload["waypoints"][-4]["index"] - 4
+    else:
+        # Need to change it to multiple airports
+        # CHANGE LANDING AIRPORT HERE
+        take_off_circuit = createLocalCircuit(KIND_50_runway)
+        land_circuit = createLocalCircuit(KLAF_050_runway) # Richmond: KRID
+
+        for i, waypoint in enumerate(land_circuit):
+            waypoint["index"] = i + ending_idx
+
+        # Set mission using token
+        print("Setting Mission...")
+        with open(f'{mission_file}', 'r') as f:
+            data = json.load(f)
+
+        payload = {
+                    "platformId": active_platform_ID,
+                    "waypoints": take_off_circuit[:-1] + data["waypoints"][1: -1] + land_circuit[1:],
+                    "forceWrite": True
+                }    
+        
+        payload["waypoints"][-4]["commands"][0]["waypointIndex"] = payload["waypoints"][-4]["index"] - 4
 
     with open(f'test.json', 'w') as outfile:
         json.dump(payload, outfile, indent=2)
