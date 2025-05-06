@@ -389,9 +389,7 @@ class ChatbotApp(QMainWindow):
         pipe = pipeline("text-generation", model=LLM_model, tokenizer=LLM_tokenizer,)
         generation_args = {"max_new_tokens": 512, "return_full_text": False, "temperature": 0.0, "do_sample": False, }
         response = pipe(self.messages, **generation_args)[0]['generated_text']
-        # self.messages.append({"role": "assistant", "content": f"{response.strip().rstrip('\n')}\n\n"})
-        self.messages.append({"role": "assistant", "content": response.strip().rstrip('\n') + "\n\n"})
-
+        self.messages.append({"role": "assistant", "content": f"{response.strip().rstrip("\n")}\n\n"})
         return response
     
     def load_response(self, response):
@@ -424,8 +422,8 @@ class ChatbotApp(QMainWindow):
 
         u_msg = ChatBubble(user_input, True, "User", max_bubble_width)
         self.chat_layout.addWidget(u_msg)
-        response = self.generate_response(user_input, LLM_model, LLM_tokenizer)
-        # response = {}
+        # response = self.generate_response(user_input, LLM_model, LLM_tokenizer)
+        response = {}
         
         if self.mode != "Chat":
             self.load_response(response)
