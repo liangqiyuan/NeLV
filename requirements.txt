@@ -2,7 +2,8 @@ numpy==1.26.4
 torch==2.2.1
 haversine==2.9.0
 networkx==2.8.8
-transformers==4.45.2
+accelerate==1.6.0
+transformers==4.51.3
 pandas==2.2.2
 geopandas==1.0.1
 osmnx==2.0.2
