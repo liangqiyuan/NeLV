@@ -9,7 +9,7 @@
     },
     {
         "role": "assistant",
-        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"forests\",\n    \"range\": 5000,\n    \"number_uavs\": 1\n}\n\n"
+        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"Forest\",\n    \"range\": 5000,\n    \"number_uavs\": 1\n}\n\n"
     },
     {
         "role": "user",
@@ -17,6 +17,6 @@
     },
     {
         "role": "assistant",
-        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"forests\",\n    \"range\": 5000,\n    \"number_uavs\": 5\n}\n\n"
+        "content": "{\n    \"start_point\": \"Purdue University\",\n    \"target\": \"Forest\",\n    \"range\": 5000,\n    \"number_uavs\": 5\n}\n\n"
     }
 ]

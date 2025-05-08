@@ -219,7 +219,7 @@ Output must be valid JSON with structure:
 
     def plot_routes(self, mission_data, route, start_idx, end_idx):
         fig, ax = plt.subplots(figsize=(10, 10))
-        mission_colors = ['red', 'green', 'blue', 'purple', 'orange', 'yellow', 'brown', 'pink', 'cyan', 'magenta']
+        mission_colors = ['blue', 'orange', 'yellow', 'brown', 'pink', 'cyan', 'magenta']
 
         mission_df = pd.DataFrame(mission_data)
         geometry = [Point(lon, lat) for lon, lat in zip(mission_df['longitude'], mission_df['latitude'])]
@@ -232,16 +232,18 @@ Output must be valid JSON with structure:
         ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
         ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
 
-        unique_missions = mission_gdf['mission'].unique()
-        mission_gdf.plot(ax=ax, column='mission', categorical=True, markersize=30, alpha=0.8, edgecolor='black', 
-                        legend=True, legend_kwds={'title': 'Mission Type'}, cmap=ListedColormap(mission_colors[:len(unique_missions)]))
-
-        mission_gdf.iloc[[0]].plot(ax=ax, color='red', marker='*', markersize=200, edgecolor='black', label='Start', zorder=2)
-        mission_gdf.iloc[[-1]].plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', label='End', zorder=2)
-
         mission_idx = [x for x in route[1:-1]]
         mission_point = mission_gdf.iloc[mission_idx]
-        mission_point.plot(ax=ax, column='mission', categorical=True, markersize=100, edgecolor='black', cmap=ListedColormap(mission_colors[:len(unique_missions)]), zorder=2)
+        unique_missions = mission_point['mission'].unique()
+        mission_gdf.plot(ax=ax, column='mission', categorical=True, markersize=50, alpha=0.8, edgecolor='black', linewidth=2, cmap=ListedColormap(mission_colors[:len(unique_missions)]))
+
+        mission_gdf.iloc[[0]].plot(ax=ax, color='red', marker='*', markersize=400, edgecolor='black', linewidth=2, label='Start Point', zorder=2)
+        mission_gdf.iloc[[-1]].plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', linewidth=2, label='End Point', zorder=2)
+
+        for i, mission_type in enumerate(unique_missions):
+            subset = mission_point[mission_point['mission'] == mission_type]
+            subset.plot(ax=ax, markersize=150, edgecolor='black', linewidth=2, color=mission_colors[i], label=mission_type, zorder=2)
+    
         route_coords = []
         for idx in route:
             route_coords.append(mission_gdf.geometry.iloc[idx])
@@ -261,7 +263,7 @@ Output must be valid JSON with structure:
             unit_dy = dy / distance
             arrow_x = from_point.x + dx * 0.5
             arrow_y = from_point.y + dy * 0.5
-            plt.annotate('', xy=(arrow_x + unit_dx*0.03, arrow_y + unit_dy*0.03), xytext=(arrow_x, arrow_y), arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc='red', ec='black', lw=1.5, mutation_scale=30), zorder=4)
+            plt.annotate('', xy=(arrow_x + unit_dx*0.03, arrow_y + unit_dy*0.03), xytext=(arrow_x, arrow_y), arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc='red', ec='black', lw=2, mutation_scale=30), zorder=4)
             total_distance += haversine((mission_data[from_idx]['latitude'], mission_data[from_idx]['longitude']), (mission_data[to_idx]['latitude'], mission_data[to_idx]['longitude']))
 
         print(f"Total Distance: {total_distance:.2f} km")

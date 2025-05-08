@@ -271,7 +271,7 @@ USERNAME = "ChuhaoDeng"
 PASSWORD = "deng113_Platform"
 
 
-mission_file = "mission.json"
+mission_file = "./temp/mission.json"
 
 
 # runway object should have lat, lng, alt, for runway center point 
@@ -593,7 +593,7 @@ def execute_pipeline(input_file):
         
         payload["waypoints"][-4]["commands"][0]["waypointIndex"] = payload["waypoints"][-4]["index"] - 4
 
-    with open(f'test.json', 'w') as outfile:
+    with open(f'./temp/test.json', 'w') as outfile:
         json.dump(payload, outfile, indent=2)
     # print(data)
         

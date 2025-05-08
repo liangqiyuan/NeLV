@@ -153,7 +153,7 @@ class FluentButton(QPushButton):
 class ChatbotApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("NeLV")
+        self.setWindowTitle("LLMAP")
         self.setWindowIcon(QIcon("icons/title_icon.png"))
         self.setGeometry(1400, 600, 1000, 1000)
         
@@ -320,13 +320,11 @@ class ChatbotApp(QMainWindow):
                     for file in glob.glob('./temp/*route_coordinates*'):
                         new_file = file.replace('route_coordinates', 'path_coordinates')
                         shutil.copy(file, new_file)
-                    route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_route.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
-                    self.chat_layout.addWidget(route_plot)
                 else:
                     self.path_planner = Path_Planner()
                     self.path_planner.plan_path("temp/route_coordinates.txt", self.n_generation, self.route_planner.xylims, self.route_planner.map_source)
-                    route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_path.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
-                    self.chat_layout.addWidget(route_plot)
+                route_plot = QLabel(); route_pixmap = QtGui.QPixmap('./temp/fig_path.png').scaled(800, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation); route_plot.setPixmap(route_pixmap); route_plot.setFixedSize(route_pixmap.size()) 
+                self.chat_layout.addWidget(route_plot)
         elif self.mode == "Upload Path":
             if not isinstance(self.route_planner, DummyChat):
                 for file in glob.glob('./temp/*path_coordinates*'):
@@ -389,7 +387,7 @@ class ChatbotApp(QMainWindow):
         pipe = pipeline("text-generation", model=LLM_model, tokenizer=LLM_tokenizer,)
         generation_args = {"max_new_tokens": 512, "return_full_text": False, "temperature": 0.0, "do_sample": False, }
         response = pipe(self.messages, **generation_args)[0]['generated_text']
-        self.messages.append({"role": "assistant", "content": f'{response.strip()}\n\n'})
+        self.messages.append({"role": "assistant", "content": f"{response.strip().rstrip("\n")}\n\n"})
         return response
     
     def load_response(self, response):
@@ -422,8 +420,8 @@ class ChatbotApp(QMainWindow):
 
         u_msg = ChatBubble(user_input, True, "User", max_bubble_width)
         self.chat_layout.addWidget(u_msg)
-        response = self.generate_response(user_input, LLM_model, LLM_tokenizer)
-        # response = {}
+        # response = self.generate_response(user_input, LLM_model, LLM_tokenizer)
+        response = {}
         
         if self.mode != "Chat":
             self.load_response(response)
@@ -437,8 +435,8 @@ class ChatbotApp(QMainWindow):
 
 if __name__ == "__main__":
 
-    LLM_model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-4-mini-instruct", device_map="cuda", torch_dtype="auto", trust_remote_code=True,)
-    LLM_tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-4-mini-instruct")
+    # LLM_model = AutoModelForCausalLM.from_pretrained("microsoft/Phi-4-mini-instruct", device_map="auto", torch_dtype="auto", trust_remote_code=False)
+    # LLM_tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-4-mini-instruct")
 
     app = QApplication(sys.argv)
     chatbot_app = ChatbotApp()

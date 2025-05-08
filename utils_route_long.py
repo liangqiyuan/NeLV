@@ -141,19 +141,23 @@ Output must be valid JSON with structure:
         ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
         
         fuel_airports = airports_gdf[airports_df['fuel_price'].notna()]
-        fuel_airports.plot(ax=ax, color='grey', markersize=10, alpha=0.5, label='Potential Fuel Stops')
+        fuel_airports.plot(ax=ax, color='grey', markersize=10, alpha=0.5, label='Fuel Station')
+        start_point = airports_gdf.iloc[[start_idx]]
+        start_point.plot(ax=ax, color='red', marker='*', markersize=400, edgecolor='black', linewidth=2, label='Start Point', zorder=3)
+        end_point = airports_gdf.iloc[[end_idx]]
+        end_point.plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', linewidth=2, label='End Point', zorder=3)
         
-        for route_type, route, color in [
-            ('shortest', routes['shortest'], 'blue'),
-            ('cheapest', routes['cheapest'], 'green'),
-            ('balanced', routes['balanced'], 'yellow')
+        for route, color, legend in [
+            (routes['shortest'], 'blue', 'Shortest Route'),
+            (routes['cheapest'], 'green', 'Cheapest Route'),
+            (routes['balanced'], 'yellow', 'Balanced Route')
         ]:
             route_coords = airports_gdf.iloc[route].geometry
             route_line = gpd.GeoSeries([LineString(route_coords)], crs=airports_gdf.crs)
-            route_line.plot(ax=ax, color=color, linewidth=2)
+            route_line.plot(ax=ax, color=color, linewidth=2, label=legend)
             fuel_idx = route[1:-1]
             fuel_point = airports_gdf.iloc[fuel_idx]
-            fuel_point.plot(ax=ax, color=color, markersize=150, edgecolor='black', label=f'Fuel Stop ({route_type})', zorder=2)
+            fuel_point.plot(ax=ax, color=color, markersize=150, edgecolor='black', linewidth=2, zorder=2)
             for i in range(len(route)-1):
                 from_idx = route[i]
                 to_idx = route[i+1]
@@ -168,12 +172,8 @@ Output must be valid JSON with structure:
                     arrow_x = from_point.x + dx * 0.5
                     arrow_y = from_point.y + dy * 0.5
                     # plt.arrow(arrow_x, arrow_y, unit_dx*0.01, unit_dy*0.01, head_width=0.5, head_length=0.8, fc=color, ec='black', zorder=4)
-                    plt.annotate('', xy=(arrow_x + unit_dx*1.4, arrow_y + unit_dy*1.4), xytext=(arrow_x, arrow_y), arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc=color, ec='black', lw=1.5, mutation_scale=30), zorder=4)
+                    plt.annotate('', xy=(arrow_x + unit_dx*1.4, arrow_y + unit_dy*1.4), xytext=(arrow_x, arrow_y), arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc=color, ec='black', lw=2, mutation_scale=30), zorder=4)
     
-        start_point = airports_gdf.iloc[[start_idx]]
-        start_point.plot(ax=ax, color='red', marker='*', markersize=200, edgecolor='black', label='Start', zorder=3)
-        end_point = airports_gdf.iloc[[end_idx]]
-        end_point.plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', label='End', zorder=3)
         self.map_source = ctx.providers.Esri.WorldPhysical
         ctx.add_basemap(ax, crs=airports_gdf.crs, source=self.map_source)
         ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=16, fancybox=True, shadow=True)

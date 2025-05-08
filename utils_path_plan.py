@@ -6,6 +6,8 @@ import xarray as xr
 import pymap3d as pm
 from PIL import Image
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle, Rectangle
+from matplotlib.legend_handler import HandlerPatch
 import geopandas as gpd
 from shapely.geometry import LineString, box, Polygon, Point
 import ast
@@ -792,10 +794,8 @@ class Path_Planner():
         points_gdf = gpd.GeoDataFrame(geometry=[Point(xy) for xy in points], crs="EPSG:4326")
         
         
-        start_point = points_gdf.iloc[[0]]
-        start_point.plot(ax=ax, color='red', marker='*', markersize=200, edgecolor='black', label='Start', zorder=3)
-        end_point = points_gdf.iloc[[-1]]
-        end_point.plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', label='End', zorder=3)
+        points_gdf.iloc[[0]].plot(ax=ax, color='red', marker='*', markersize=400, edgecolor='black', linewidth=2, label='Take-Off Point', zorder=3)
+        points_gdf.iloc[[-1]].plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', linewidth=2, label='Landing Point', zorder=3)
         
         path_gdf = gpd.GeoDataFrame(geometry=[LineString(points)], crs="EPSG:4326")
         path_gdf.plot(ax=ax, color='black', linewidth=3)
@@ -803,10 +803,18 @@ class Path_Planner():
             idx = int((n_points+1)*(j+1))
             if idx < len(points_gdf):
                 way_point = points_gdf.iloc[[idx]]
-                way_point.plot(ax=ax, color='black', markersize=150, edgecolor='black', label='Mission Point', zorder=2)
+                label = 'Mission Point' if j == 0 else None
+                way_point.plot(ax=ax, color='black', markersize=150, label=label, zorder=2)
+
+        handles, labels = ax.get_legend_handles_labels()
+        airspace = Circle((0,0), radius=2, edgecolor='blue', facecolor='none', linewidth=2, fill=False)
+        populated_area = Rectangle((0,0), width=1, height=1, edgecolor='red', facecolor='none', linewidth=2, fill=False)
+        def make_legend_circle(legend, orig_handle, xdescent, ydescent, width, height, fontsize):
+            return Circle((xdescent + width/2, ydescent + height/2), min(width, height)/2)
+        legend_handler = {airspace: HandlerPatch(patch_func=make_legend_circle)}
 
         ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
-        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=10, fancybox=True, shadow=True)
+        ax.legend([airspace, populated_area], ["Controlled Airspace", "Populated Area"], handler_map=legend_handler, loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=18, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0, dpi=150)
         plt.close()

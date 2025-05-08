@@ -132,10 +132,10 @@ Output must be valid JSON with structure:
                 routes.append(route)
         return routes
 
-    def plot_routes(self, mission_data, routes):
+    def plot_route(self, mission_data, routes, target):
         fig, ax = plt.subplots(figsize=(10, 10))
         mission_df = pd.DataFrame(mission_data)
-        mission_df['type'] = ['Start' if i == 0 else 'Mission' for i in range(len(mission_data))]
+        mission_df['type'] = ['Start Point' if i == 0 else target for i in range(len(mission_data))]
         geometry = [Point(p['longitude'], p['latitude']) for p in mission_data]
         mission_gdf = gpd.GeoDataFrame(mission_df, geometry=geometry, crs="EPSG:4326")
 
@@ -146,15 +146,14 @@ Output must be valid JSON with structure:
         ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
         ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
         
-        airport = mission_gdf[mission_gdf['type'] == 'Start']
-        mission = mission_gdf[mission_gdf['type'] == 'Mission']
-        airport.plot(ax=ax, color='red', marker='*', markersize=200, edgecolor='black', label='Start', zorder=3)
-        mission.plot(ax=ax, color='green', marker='o', markersize=100, edgecolor='black', label='Mission Points', zorder=2)
+        airport = mission_gdf[mission_gdf['type'] == 'Start Point']
+        mission = mission_gdf[mission_gdf['type'] == target]
+        airport.plot(ax=ax, color='red', marker='*', markersize=400, edgecolor='black', linewidth=2, label='Start Point', zorder=3)
+        mission.plot(ax=ax, color='green', marker='o', markersize=100, edgecolor='black', linewidth=2, label=target, zorder=2)
 
-        colors = ['blue', 'orange', 'cyan', 'magenta', 'brown', 'pink', 'olive', 'navy', 'teal']
+        colors = ['blue', 'orange', 'cyan', 'magenta', 'yellow']
         total_distance = 0
 
-        # ax.plot([], [], color='blue', linewidth=2, linestyle='-', label='UAV Route')
         for i, route in enumerate(routes):
             color = colors[i % len(colors)]
             route_points = [mission_gdf.geometry.iloc[j] for j in route]
@@ -172,7 +171,7 @@ Output must be valid JSON with structure:
                 unit_dx, unit_dy = dx / distance, dy / distance
                 arrow_x, arrow_y = from_point.x + dx * 0.5, from_point.y + dy * 0.5
                 plt.annotate('', xy=(arrow_x + unit_dx*0.003, arrow_y + unit_dy*0.003), xytext=(arrow_x, arrow_y), 
-                            arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc=color, ec='black', lw=1.5, mutation_scale=30), zorder=4)
+                            arrowprops=dict(arrowstyle='wedge,tail_width=0.25', fc=color, ec='black', lw=2, mutation_scale=30), zorder=4)
                 segment_distance = haversine((mission_data[from_idx]['latitude'], mission_data[from_idx]['longitude']), (mission_data[to_idx]['latitude'], mission_data[to_idx]['longitude']))
                 agent_distance += segment_distance
             
@@ -180,8 +179,8 @@ Output must be valid JSON with structure:
             print(f"UAV {i+1} Distance: {agent_distance:.2f} km")
         
 
-        legend_elements = [Line2D([0], [0], marker='*', color='w', markerfacecolor='red', markeredgecolor='black', markersize=20, label='Start'),
-                        Line2D([0], [0], marker='o', color='w', markerfacecolor='green', markeredgecolor='black', markersize=15, label='Mission Points')]
+        legend_elements = [Line2D([0], [0], marker='*', color='w', markerfacecolor='red', markeredgecolor='black', markersize=20, label='Start Point'),
+                        Line2D([0], [0], marker='o', color='w', markerfacecolor='green', markeredgecolor='black', markersize=15, label=target)]
         
         class HandlerColorLine(HandlerBase):
             def create_artists(self, legend, orig_handle, xdescent, ydescent, width, height, fontsize, trans):
@@ -204,16 +203,19 @@ Output must be valid JSON with structure:
         rainbow_colors = colors[:len(routes)]
         colorline = ColorLine(rainbow_colors, linewidth=2)
         legend_elements.append(colorline)
-        ax.legend(legend_elements, ['Start', 'Mission Points', 'UAV Route'], handler_map={ColorLine: HandlerColorLine()}, 
+        ax.legend(legend_elements, ['Start Point', target, 'Route'], handler_map={ColorLine: HandlerColorLine()}, 
                 loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
-
 
         print(f"Total Distance (all agents): {total_distance:.2f} km")
         self.map_source = ctx.providers.Esri.WorldImagery
         ctx.add_basemap(ax, crs=mission_gdf.crs, source=self.map_source)
-        # ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0, dpi=150)
+
+        ax.legend(legend_elements, ['Start Point', target, 'Path'], handler_map={ColorLine: HandlerColorLine()}, 
+                loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
+        plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0, dpi=150)
+
     
     def save_route_to_txt(self, mission_data, routes):
         all_points = []
@@ -229,7 +231,7 @@ Output must be valid JSON with structure:
                 planned_flight[key] = self.default_flight[key]
 
         print(planned_flight)
-        mapping = {'forests': {'natural': 'wood'}}
+        mapping = {'Forest': {'natural': 'wood'}}
 
         start = self.find_closest_airport(planned_flight['start_point'])
         start_idx = self.airports_df[self.airports_df['name'] == start].index[0]
@@ -239,7 +241,7 @@ Output must be valid JSON with structure:
 
         routes = self.find_optimal_route(mission_data, planned_flight['number_uavs'])
         print(routes)
-        self.plot_routes(mission_data, routes)
+        self.plot_route(mission_data, routes, planned_flight['target'])
         self.save_route_to_txt(mission_data, routes)
 
 
