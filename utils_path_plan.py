@@ -185,6 +185,7 @@ class Path_Planner():
         for i in range(1, len(lines) - 1):
             land_mark.append(np.array(list(map(float, lines[i].split(' ')))))
         airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
+        print(len(airspace_geo))
         all_cities_geo, ground_level = self.load_cities(bound_west)
         self.plot_path(all_best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source)
 
@@ -388,6 +389,8 @@ class Path_Planner():
         temp = []
         record = False
 
+        count = 0
+
         for i in range(len(lines) - 1):
             line = lines[i]
             split_line = line.split(' ')
@@ -401,19 +404,23 @@ class Path_Planner():
                     alt = int(split_line[1][0:-2])
                 except:
                     alt = 1e6
-                if line[3:6] == 'GND' or alt <= 40000:  # 1500:
-                    try:
-                        temp_split = lines[i + 1].split(' ')
+                if line[3:6] == 'GND':
+                    alt = 0
+                if alt <= 40000:  # 1500:
+                    temp_split = lines[i + 1].split(' ')
+                    if temp_split[1][0:2] == 'FL':
+                        alt_up = int(temp_split[1][2:])*100
+                    else:
                         alt_up = int(temp_split[1][0:-2])
-                    except:
-                        alt_up = 1e6
                     if long_range:
-                        if alt_up >= 40000:
+                        if alt_up >= 20000:
+                            count += 1
                             record = True
                         else:
                             record = False
                     else:
-                        if line[3:6] == 'GND' or (0 <= alt <= 2000 and alt_up <= 2000):
+                        # if line[3:6] == 'GND' or (0 <= alt <= 2000 and alt_up <= 2000):
+                        if alt <= 2000 and alt_up > 0 and alt_up > alt:
                             record = True
                         else:
                             record = False
