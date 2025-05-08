@@ -389,7 +389,6 @@ class Path_Planner():
         temp = []
         record = False
 
-        count = 0
 
         for i in range(len(lines) - 1):
             line = lines[i]
@@ -413,8 +412,7 @@ class Path_Planner():
                     else:
                         alt_up = int(temp_split[1][0:-2])
                     if long_range:
-                        if alt_up >= 20000:
-                            count += 1
+                        if alt_up >= 15000:
                             record = True
                         else:
                             record = False
