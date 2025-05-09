@@ -6,7 +6,7 @@ import xarray as xr
 import pymap3d as pm
 from PIL import Image
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Circle, Rectangle, Patch
 from matplotlib.legend_handler import HandlerPatch
 import geopandas as gpd
 from shapely.geometry import LineString, box, Polygon, Point
@@ -187,7 +187,7 @@ class Path_Planner():
         airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
         print(len(airspace_geo))
         all_cities_geo, ground_level = self.load_cities(bound_west)
-        self.plot_path(all_best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source)
+        self.plot_path(all_best_path, airspace_geo, all_cities_geo, sfip, brn, cape, land_mark, n_points, long_range, xylims, map_source)
 
     def weather_data(self, year, month, day, long_range):
 
@@ -771,7 +771,7 @@ class Path_Planner():
         velocity = w*velocity + c1*rp*(p - population) + c2*rg*(g - population)
         return population+velocity
 
-    def plot_path(self, best_path, airspace_geo, all_cities_geo, land_mark, n_points, long_range, xylims, map_source):
+    def plot_path(self, best_path, airspace_geo, all_cities_geo, sfip, brn, cape, land_mark, n_points, long_range, xylims, map_source):
         fig, ax = plt.subplots(figsize=(10, 10))
         ax.set_xlim(xylims[0][0], xylims[0][1])
         ax.set_ylim(xylims[1][0], xylims[1][1])
@@ -811,15 +811,18 @@ class Path_Planner():
                 label = 'Mission Point' if j == 0 else None
                 way_point.plot(ax=ax, color='black', markersize=150, label=label, zorder=2)
 
+
         handles, labels = ax.get_legend_handles_labels()
         airspace = Circle((0,0), radius=2, edgecolor='blue', facecolor='none', linewidth=2, fill=False)
         populated_area = Rectangle((0,0), width=1, height=1, edgecolor='red', facecolor='none', linewidth=2, fill=False)
         def make_legend_circle(legend, orig_handle, xdescent, ydescent, width, height, fontsize):
             return Circle((xdescent + width/2, ydescent + height/2), min(width, height)/2)
         legend_handler = {airspace: HandlerPatch(patch_func=make_legend_circle)}
+        weather_risk = Patch(facecolor='red', alpha=0.3, edgecolor='none', label='Weather Risk')
 
         ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
-        ax.legend([airspace, populated_area], ["Controlled Airspace", "Populated Area"], handler_map=legend_handler, loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=18, fancybox=True, shadow=True)
+        ax.imshow((sfip+brn+cape)[::5, ::5], cmap='hot', alpha=0.3, extent=[xylims[0][0], xylims[0][1], xylims[1][0], xylims[1][1]])
+        ax.legend([airspace, populated_area, weather_risk], ["Controlled Airspace", "Populated Area", "Weather Risk"], handler_map=legend_handler, loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=18, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0, dpi=150)
         plt.close()
