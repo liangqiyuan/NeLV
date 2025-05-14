@@ -271,7 +271,7 @@ USERNAME = "ChuhaoDeng"
 PASSWORD = "deng113_Platform"
 
 
-mission_file = "./temp/mission.json"
+mission_file = "mission.json"
 
 
 # runway object should have lat, lng, alt, for runway center point 
@@ -367,7 +367,7 @@ KEVV_360_runway = {
         } # Evansville
 
 KIND_50_runway = {
-            "lat": 39.71735330835, 
+            "lat": 39.71835330835,
             "lng": -86.30684189165,
             "alt": 116.7,
             "heading": 50,
@@ -381,21 +381,32 @@ def create_json(input_file, mission_file, starting_idx):
     all_latitude = []
     all_longitude = []
 
-    # Parse the data
-    waypoints = []
     for i, line in enumerate(lines):
         lat, lon, alt = map(float, line.split())
         all_latitude.append(lat)
         all_longitude.append(lon)
+
+    if abs(min(all_latitude) - max(all_latitude)) > 8 or abs(min(all_longitude) - max(all_longitude)) > 8:
+        long_range = True
+    else:
+        long_range = False
+
+    # Parse the data
+    waypoints = []
+    for i, line in enumerate(lines):
+        lat, lon, alt = map(float, line.split())
         
         if i == 0:
             waypoint_type = "TakeOff"
-        elif i == 3:
-            waypoint_type = "LoiterTurns"
+        # elif i == 3:
+        #     waypoint_type = "LoiterTurns"
         elif i == len(lines) - 1:
             waypoint_type = "Land"
         else:
             waypoint_type = "Waypoint"
+        if not long_range:
+            if i==2 or i==3:
+                waypoint_type = "LoiterTurns"
         
         waypoint = {
             "index": i + starting_idx,
@@ -428,31 +439,27 @@ def create_json(input_file, mission_file, starting_idx):
 
     print(f"{mission_file} file has been created successfully.")
     time.sleep(3)
-    if abs(min(all_latitude) - max(all_latitude)) > 8 or abs(min(all_longitude) - max(all_longitude)) > 8:
-        long_range = True
-    else:
-        long_range = False
+
 
     return i + starting_idx, long_range
 
-
-def start_sim(sim_number, headers):
+def start_sim(sim_number, headers, runway):
     """
     Receives an encounter scenario and starts a simulator that is relevant for this.
     Returns the expected sim ID
     """
-   
+
     print("Starting Simulator " + str(sim_number))
     payload = {
         "simulationType": "ProductionSim-Peregrine",
         "numberOfInstances": 1,
         "prefix": "DAATest" + str(sim_number),
         "location": {                                 # Spawn location for the aircraft
-                    "latDeg": 40.411,
-                    "lngDeg": -86.9272,
+                    "latDeg": runway['lat'],
+                    "lngDeg": runway['lng'],
                     "altM": 213.36
                 },                                 
-        "headingDeg": 280                                 # Spawn heading for the aircraft
+        "headingDeg": runway['heading']                                 # Spawn heading for the aircraft
     }
 
     response = requests.post(CONNECTION_URL + '/app/Simulation/addBatchSimulation', headers=headers, json=payload)
@@ -494,6 +501,15 @@ def set_auto_mode_for_sim(platform_ID, headers):
 
 def execute_pipeline(input_file):
 
+    # # Create json file from txt
+    ending_idx, long_range = create_json(input_file=input_file, mission_file=mission_file, starting_idx=9)
+    ending_idx -= 1
+    if long_range:
+        take_off_runway = KLAF_100_runway
+        land_runway = KLAF_100_runway
+    else:
+        take_off_runway = KIND_50_runway
+        land_runway = KLAF_100_runway
 
 # Get authentication token
     print("Getting Token...")
@@ -505,16 +521,10 @@ def execute_pipeline(input_file):
     # Create authorised header
     headers = {"Authorization": "Bearer "+ token}
 
-    # response = requests.get(CONNECTION_URL + '/app/account/getPlatforms',headers=headers)
-    # firstPlatformInfo = response.json()[0]
-    # active_platform_ID = firstPlatformInfo["id"]
-    # print("Found a platform with Id: %s" % active_platform_ID, "\n")
-
-
     ####### STARTING SIMULATOR ##################
 
     # Start a simulator with the correct starting conditions
-    sim_ID = start_sim(0, headers)
+    sim_ID = start_sim(0, headers, take_off_runway)
     time.sleep(1)
     
     print("Please wait for the Sims to start...")
@@ -544,17 +554,11 @@ def execute_pipeline(input_file):
 
     ####### SETTING AND GETTING A MISSION #######
 
-    # CHANGE TAKEOFF AIRPORT HERE
-    take_off_circuit = createLocalCircuit(KLAF_050_runway)
-    starting_idx = len(take_off_circuit) - 2
-    
-        # Create json file from txt
-    ending_idx, long_range = create_json(input_file=input_file, mission_file=mission_file, starting_idx=starting_idx) - 1
 
     if not long_range:
         # CHANGE LANDING AIRPORT HERE
-        take_off_circuit = createLocalCircuit(KIND_50_runway)
-        land_circuit = createLocalCircuit(KLAF_050_runway) # Richmond: KRID
+        take_off_circuit = createLocalCircuit(take_off_runway)
+        land_circuit = createLocalCircuit(land_runway) # Richmond: KRID
 
         for i, waypoint in enumerate(land_circuit):
             waypoint["index"] = i + ending_idx
@@ -593,7 +597,7 @@ def execute_pipeline(input_file):
         
         payload["waypoints"][-4]["commands"][0]["waypointIndex"] = payload["waypoints"][-4]["index"] - 4
 
-    with open(f'./temp/test.json', 'w') as outfile:
+    with open(f'test.json', 'w') as outfile:
         json.dump(payload, outfile, indent=2)
     # print(data)
         
