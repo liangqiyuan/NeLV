@@ -68,7 +68,7 @@ class ChatBubble(QWidget):
         label = QLabel()
         label.setText(text)
 
-        font_metrics = QFontMetrics(QFont("Comic Sans MS", 20))
+        font_metrics = QFontMetrics(QFont("Comic Sans MS", 21))
         text_width = font_metrics.horizontalAdvance(text)
         
         label.setWordWrap(True)
@@ -80,7 +80,7 @@ class ChatBubble(QWidget):
             label.setStyleSheet("font-family: 'Comic Sans MS'; font-size: 26px; background-color: rgb(224, 244, 218); border-radius: 15px; color: black; border: 2px solid rgb(53, 105, 32); padding: 8px 16px;")
             label.setAlignment(Qt.AlignJustify)
             print(text_width)
-            left_space = min(int(max_width - text_width), int(max_width * 0.7)) if text_width <= max_width * 0.7 else int(max_width * 0.3)
+            left_space = min(int(max_width - text_width), int(max_width * 0.65)) if text_width <= max_width * 0.65 else int(max_width * 0.35)
             spacer_left = QSpacerItem(left_space, 10, QSizePolicy.Fixed, QSizePolicy.Minimum)
             bubble_layout.addSpacerItem(spacer_left)
             bubble_layout.addWidget(label)
@@ -283,6 +283,8 @@ class ChatbotApp(QMainWindow):
         central_widget.setLayout(final_layout)
         
         self.messages = [{"role": "system", "content": self.route_planner.system_prompt}]
+        # Video
+        self.response_ind = 0
         self.n_generation = 10
     
     def choose_model(self, button_id):
@@ -298,12 +300,27 @@ class ChatbotApp(QMainWindow):
         elif self.mode == "Short Range":
             self.route_planner = ShortRoutePlanner()
             self.reset_chat()
+            # Video
+            with open("examples/short_range.json", "r", encoding="utf-8") as file:
+                self.assistant_response = json.load(file)
+            self.assistant_response = [item["content"] for item in self.assistant_response if item["role"] == "assistant"]
+
         elif self.mode == "Medium Range":
             self.route_planner = MediumRoutePlanner()
             self.reset_chat()
+            # Video
+            with open("examples/medium_range.json", "r", encoding="utf-8") as file:
+                self.assistant_response = json.load(file)
+            self.assistant_response = [item["content"] for item in self.assistant_response if item["role"] == "assistant"]
+
         elif self.mode == "Long Range":
             self.route_planner = LongRoutePlanner()
             self.reset_chat()
+
+            # Video
+            with open("examples/long_range.json", "r", encoding="utf-8") as file:
+                self.assistant_response = json.load(file)
+            self.assistant_response = [item["content"] for item in self.assistant_response if item["role"] == "assistant"]
 
         elif self.mode == "Plan Route":
             for file in glob.glob('./temp/*route_coordinates*'):
@@ -374,6 +391,8 @@ class ChatbotApp(QMainWindow):
             if widget:
                 widget.deleteLater()
         self.messages = [{"role": "system", "content": self.route_planner.system_prompt}]
+        # Video
+        self.response_ind = 0
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Enter or event.key() == Qt.Key_Return:
@@ -424,6 +443,9 @@ class ChatbotApp(QMainWindow):
         response = {}
         
         if self.mode != "Chat":
+            # Video
+            response = self.assistant_response[self.response_ind]
+            self.response_ind += 1
             self.load_response(response)
             llm_msg = ChatBubble(format_json(self.planned_flight), False, "LLM-as-Parser", max_bubble_width)
         else:
