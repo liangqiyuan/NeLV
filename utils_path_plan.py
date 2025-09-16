@@ -53,7 +53,7 @@ class Path_Planner():
         else:
             long_range = False
 
-        sfip, cape, brn, u_wind, v_wind = self.weather_data(year, month, day, long_range)
+        sfip, cape, brn, u_wind, v_wind, lons, lats = self.weather_data(year, month, day, long_range)
 
         w_0 = 10 # constraint penalties
         w_1 = 1 # path distance
@@ -163,14 +163,12 @@ class Path_Planner():
                 p[idx] = new_population[idx]
                 p_real_penalties[idx] = x_real_penalties[idx]
                 if np.any(p_real_penalties < g):
-                    print('================================')
                     g = np.min(p_real_penalties)
                     best_path = p[np.argmin(p_real_penalties)]
                 if np.any(x_penalties[:, 0] < shortest_path_length):
                     raise Exception("Shorter than the shortest path!")
                 population = new_population.copy()
 
-                print(f'Finished No.{i + 1} generation!')
                 # np.savetxt(f'./temp/path_coordinates_{num_line}_{i}.txt', best_path)
 
             all_best_path.append(best_path[0:-1])
@@ -187,7 +185,7 @@ class Path_Planner():
         airspace_geo = self.load_airspace(bound_north, bound_west, long_range)
         print(len(airspace_geo))
         all_cities_geo, ground_level = self.load_cities(bound_west)
-        self.plot_path(all_best_path, airspace_geo, all_cities_geo, sfip, brn, cape, land_mark, n_points, long_range, xylims, map_source)
+        self.plot_path(all_best_path, airspace_geo, all_cities_geo, sfip, brn, cape, lons, lats, land_mark, n_points, long_range, xylims, map_source)
 
     def weather_data(self, year, month, day, long_range):
 
@@ -199,15 +197,16 @@ class Path_Planner():
         )
 
         if long_range:
-            altitude = '950 mb'
-        else:
             altitude = '250 mb'
+        else:
+            altitude = '950 mb'
         clwmr = H.xarray(f"CLMR:{altitude}")  # Cloud Mixing Ratio [kg/kg]
         cice = H.xarray(f"CIMIXR:{altitude}")  # Cloud Ice Mixing Ratio [kg/kg]
         spfh = H.xarray(f"SPFH:{altitude}")  # Specific Humidity [kg/kg]
         rwmr = H.xarray(f"RWMR:{altitude}")  # Rain Mixing Ratio [kg/kg]
         snmr = H.xarray(f"SNMR:{altitude}")  # Snow Mixing Ratio [kg/kg]
-        t = (H.xarray(f"TMP:{altitude}"))['t'].values - 273.15  # Temperature [K]
+        t_data = H.xarray(f"TMP:{altitude}")
+        t = t_data['t'].values - 273.15  # Temperature [K]
         rh = (H.xarray(f"RH:{altitude}"))['r'].values  # Relative Humidity [%]
         vvel = (H.xarray(f"VVEL:{altitude}"))['w'].values  # Vertical Velocity (Pressure) [Pa/s]
         cape = (H.xarray("CAPE:255-0 mb above ground"))['cape'].values  # Vertical Velocity (Pressure) [Pa/s]
@@ -215,6 +214,10 @@ class Path_Planner():
         vvcsh = (H.xarray("VVCSH:0-6000 m above ground"))['vvcsh'].values  # Vertical Velocity (Pressure) [Pa/s]
         ugrd = H.xarray(f"UGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
         vgrd = H.xarray(f"VGRD:{altitude}")  # Vertical Velocity (Pressure) [Pa/s]
+        
+        # Get longitude and latitude coordinates
+        lons = t_data.longitude.values
+        lats = t_data.latitude.values
 
         m_rh = copy.copy(rh)
         m_t = copy.copy(t)
@@ -261,7 +264,7 @@ class Path_Planner():
         sfip = m_t * (alpha*m_rh + beta*m_vvel + gamma*m_lwc)
         sfip[sfip < 0] = 0
 
-        return sfip, m_cape, m_brn, ugrd, vgrd
+        return sfip, m_cape, m_brn, ugrd, vgrd, lons, lats
     
     def create_idx(self, object):
         spatial_index = index.Index()
@@ -771,10 +774,13 @@ class Path_Planner():
         velocity = w*velocity + c1*rp*(p - population) + c2*rg*(g - population)
         return population+velocity
 
-    def plot_path(self, best_path, airspace_geo, all_cities_geo, sfip, brn, cape, land_mark, n_points, long_range, xylims, map_source):
+    def plot_path(self, best_path, airspace_geo, all_cities_geo, sfip, brn, cape, lons, lats, land_mark, n_points, long_range, xylims, map_source):
         fig, ax = plt.subplots(figsize=(10, 10))
-        ax.set_xlim(xylims[0][0], xylims[0][1])
-        ax.set_ylim(xylims[1][0], xylims[1][1])
+        center_x, center_y, half_size, ratio = xylims
+        ax.set_xlim(center_x - half_size, center_x + half_size)
+        ax.set_ylim(center_y - half_size, center_y + half_size)
+
+        # ax.set_aspect('equal', adjustable='box')
 
         airspace_gdf_list = []
         for area in airspace_geo:
@@ -783,7 +789,7 @@ class Path_Planner():
         
         if airspace_gdf_list:
             airspace_gdf = gpd.GeoDataFrame(pd.concat(airspace_gdf_list, ignore_index=True), crs="EPSG:4326")
-            airspace_gdf.plot(ax=ax, color='blue')
+            airspace_gdf.plot(ax=ax, color='#003366', linewidth=2)
         
         cities_gdf_list = []
         for city in all_cities_geo:
@@ -793,12 +799,10 @@ class Path_Planner():
         if not long_range:
           if cities_gdf_list:
               cities_gdf = gpd.GeoDataFrame(pd.concat(cities_gdf_list, ignore_index=True), crs="EPSG:4326")
-              cities_gdf.plot(ax=ax, color='red')
+              cities_gdf.plot(ax=ax, color='#8B0000')
         
         points = [(point[1], point[0]) for point in best_path]
         points_gdf = gpd.GeoDataFrame(geometry=[Point(xy) for xy in points], crs="EPSG:4326")
-        
-        
         points_gdf.iloc[[0]].plot(ax=ax, color='red', marker='*', markersize=400, edgecolor='black', linewidth=2, label='Take-Off Point', zorder=3)
         points_gdf.iloc[[-1]].plot(ax=ax, color='purple', marker='D', markersize=100, edgecolor='black', linewidth=2, label='Landing Point', zorder=3)
         
@@ -811,17 +815,41 @@ class Path_Planner():
                 label = 'Mission Point' if j == 0 else None
                 way_point.plot(ax=ax, color='black', markersize=150, label=label, zorder=2)
 
-
-        handles, labels = ax.get_legend_handles_labels()
-        airspace = Circle((0,0), radius=2, edgecolor='blue', facecolor='none', linewidth=2, fill=False)
-        populated_area = Rectangle((0,0), width=1, height=1, edgecolor='red', facecolor='none', linewidth=2, fill=False)
+        airspace = Circle((0,0), radius=2, edgecolor='#003366', facecolor='none', linewidth=2, fill=False)
+        populated_area = Rectangle((0,0), width=1, height=1, edgecolor='#8B0000', facecolor='none', linewidth=2, fill=False)
         def make_legend_circle(legend, orig_handle, xdescent, ydescent, width, height, fontsize):
             return Circle((xdescent + width/2, ydescent + height/2), min(width, height)/2)
         legend_handler = {airspace: HandlerPatch(patch_func=make_legend_circle)}
         weather_risk = Patch(facecolor='red', alpha=0.3, edgecolor='none', label='Weather Risk')
 
         ctx.add_basemap(ax, crs=path_gdf.crs, source=map_source)
-        ax.imshow((sfip+brn+cape)[::5, ::5], cmap='hot', alpha=0.3, extent=[xylims[0][0], xylims[0][1], xylims[1][0], xylims[1][1]])
+        
+        lon_min, lon_max = center_x - half_size, center_x + half_size
+        lat_min, lat_max = center_y - half_size*ratio, center_y + half_size*ratio
+        lons = np.where(lons > 180, lons - 360, lons)
+        lon_mask = (lons >= lon_min) & (lons <= lon_max)
+        lat_mask = (lats >= lat_min) & (lats <= lat_max)
+        combined_mask = lon_mask & lat_mask
+        valid_rows, valid_cols = np.where(combined_mask)
+        lat_start, lat_end = valid_rows.min(), valid_rows.max() + 1
+        lon_start, lon_end = valid_cols.min(), valid_cols.max() + 1
+        
+        sfip_crop = sfip[lat_start:lat_end, lon_start:lon_end]
+        brn_crop = brn[lat_start:lat_end, lon_start:lon_end]
+        cape_crop = cape[lat_start:lat_end, lon_start:lon_end]
+        weather_data = sfip_crop + brn_crop + cape_crop
+        data_min, data_max = weather_data.min(), weather_data.max()
+        weather_normalized = ((weather_data - data_min) / (data_max - data_min) * 255).astype(np.uint8)
+        
+        upsample_factor = 10
+        pil_image = Image.fromarray(weather_normalized)
+        max_dim = max(weather_normalized.shape[0], weather_normalized.shape[1])
+        upsampled_image = pil_image.resize((max_dim * upsample_factor, max_dim * upsample_factor), Image.LANCZOS)
+        
+        weather_heat = np.array(upsampled_image).astype(np.float32)
+        weather_heat = weather_heat / 255.0 * (data_max - data_min) + data_min
+        ax.imshow(weather_heat, cmap='hot', alpha=0.3, extent=[center_x - half_size, center_x + half_size, center_y - half_size, center_y + half_size])
+
         ax.legend([airspace, populated_area, weather_risk], ["Controlled Airspace", "Populated Area", "Weather Risk"], handler_map=legend_handler, loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=18, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_path.png', bbox_inches='tight', pad_inches=0, dpi=150)
