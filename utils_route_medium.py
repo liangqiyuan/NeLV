@@ -228,9 +228,10 @@ Output must be valid JSON with structure:
         x_min, y_min, x_max, y_max = mission_gdf.geometry.total_bounds
         center_x, center_y = (x_max + x_min) / 2, (y_max + y_min) / 2
         half_size = max(x_max - x_min, y_max - y_min) / 2 * 1.2
-        self.xylims = [[center_x - half_size, center_x + half_size], [center_y - half_size*609/790, center_y + half_size*609/790]]
-        ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
-        ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
+        ratio = 605/790
+        ax.set_xlim(center_x - half_size, center_x + half_size)
+        ax.set_ylim(center_y - half_size*ratio, center_y + half_size*ratio)
+        self.xylims = (center_x, center_y, half_size, ratio)
 
         mission_idx = [x for x in route[1:-1]]
         mission_point = mission_gdf.iloc[mission_idx]
@@ -269,9 +270,10 @@ Output must be valid JSON with structure:
         print(f"Total Distance: {total_distance:.2f} km")
         self.map_source = ctx.providers.OpenStreetMap.Mapnik
         ctx.add_basemap(ax, crs=mission_gdf.crs, source=self.map_source)
-        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=22, fancybox=True, shadow=True)
+        ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=18, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0, dpi=150)
+        plt.close()
 
     def save_route_to_txt(self, mission_data, route):
         all_points = []
