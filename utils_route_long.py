@@ -136,9 +136,10 @@ Output must be valid JSON with structure:
         x_min, y_min, x_max, y_max = airports_gdf.geometry.total_bounds
         center_x, center_y = (x_max + x_min) / 2, (y_max + y_min) / 2
         half_size = max(x_max - x_min, y_max - y_min) / 2
-        self.xylims = [[center_x - half_size, center_x + half_size], [center_y-7 - half_size*658/790, center_y-7 + half_size*658/790]]
-        ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
-        ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
+        ratio = 626/790
+        ax.set_xlim(center_x - half_size, center_x + half_size)
+        ax.set_ylim(center_y - half_size*ratio, center_y + half_size*ratio)
+        self.xylims = (center_x, center_y, half_size, ratio)
         
         fuel_airports = airports_gdf[airports_df['fuel_price'].notna()]
         fuel_airports.plot(ax=ax, color='grey', markersize=10, alpha=0.5, label='Fuel Station')
@@ -179,6 +180,7 @@ Output must be valid JSON with structure:
         ax.legend(loc='lower left', bbox_to_anchor=(0.02, 0.02), fontsize=16, fancybox=True, shadow=True)
         plt.axis('off')
         plt.savefig('./temp/fig_route.png', bbox_inches='tight', pad_inches=0, dpi=150)
+        plt.close()
     
     def save_route_to_txt(self, mission_data, route):
         all_points = []
@@ -197,8 +199,7 @@ Output must be valid JSON with structure:
         start_idx = self.airports_df[self.airports_df['name'] == start].index[0]
         end_idx = self.airports_df[self.airports_df['name'] == end].index[0]
         
-        # routes = find_optimal_routes(airports_df, start_idx, end_idx, tank_capacity, miles_per_liter)
-        routes = {'shortest': [1493, 732, 735, 296, 189], 'cheapest': [1493, 2179, 604, 1363, 1345, 117, 131, 216, 162, 176, 189], 'balanced': [1493, 1504, 741, 1132, 790, 789, 756, 117, 131, 216, 245, 162, 172, 163, 176, 189]}
+        routes = self.find_optimal_routes(self.airports_df, start_idx, end_idx, self.tank_capacity, self.miles_per_liter)
         print(routes)
         
         self.plot_routes(self.airports_df, routes, start_idx, end_idx)
