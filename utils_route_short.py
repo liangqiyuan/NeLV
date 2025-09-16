@@ -142,9 +142,14 @@ Output must be valid JSON with structure:
         x_min, y_min, x_max, y_max = mission_gdf.geometry.total_bounds
         center_x, center_y = (x_max + x_min) / 2, (y_max + y_min) / 2
         half_size = max(x_max - x_min, y_max - y_min) / 2 * 1.1
-        self.xylims = [[center_x - half_size, center_x + half_size], [center_y - half_size*606/790, center_y + half_size*606/790]]
-        ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
-        ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
+        # self.xylims = [[center_x - half_size, center_x + half_size], [center_y - half_size*602/790, center_y + half_size*602/790]]
+        # ax.set_xlim(self.xylims[0][0], self.xylims[0][1])
+        # ax.set_ylim(self.xylims[1][0], self.xylims[1][1])
+
+        ratio = 602/790
+        ax.set_xlim(center_x - half_size, center_x + half_size)
+        ax.set_ylim(center_y - half_size*ratio, center_y + half_size*ratio)
+        self.xylims = (center_x, center_y, half_size, ratio)
         
         airport = mission_gdf[mission_gdf['type'] == 'Start Point']
         mission = mission_gdf[mission_gdf['type'] == target]
