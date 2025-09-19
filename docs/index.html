@@ -249,7 +249,7 @@
               </span>
               <span class="author-block">
                 <a href="https://scholar.google.com/citations?user=6isFoKAAAAAJ&hl=en" target="_blank">Chuhao Deng</a><sup>1,*</sup>,
-              </span>
+              </span><br>
               <span class="author-block">
                 <a href="https://sites.google.com/view/djhan930/team/professor?authuser=0" target="_blank">Dong-Jun Han</a><sup>2</sup>,
               </span>
@@ -281,7 +281,8 @@
 
                   <div class="column has-text-centered">
                     <div class="publication-links">
-                         <!-- TODO: Update with your arXiv paper ID -->
+                      
+                      <!-- TODO: Update with your arXiv paper ID -->
                       <span class="link-block">
                         <a href="https://arxiv.org/pdf/<ARXIV PAPER ID>.pdf" target="_blank"
                         class="external-link button is-normal is-rounded is-dark">
@@ -289,47 +290,37 @@
                           <i class="fas fa-file-pdf"></i>
                         </span>
                         <span>Paper</span>
-                      </a>
-                    </span>
+                        </a>
+                        </span>
 
-                    <!-- TODO: Add your supplementary material PDF or remove this section -->
-                    <span class="link-block">
-                      <a href="static/pdfs/supplementary_material.pdf" target="_blank"
-                      class="external-link button is-normal is-rounded is-dark">
-                      <span class="icon">
-                        <i class="fas fa-file-pdf"></i>
+                      <!-- GitHub repository URL -->
+                      <span class="link-block">
+                        <a href="https://github.com/liangqiyuan/NeLV" target="_blank"
+                        class="external-link button is-normal is-rounded is-dark">
+                        <span class="icon">
+                          <i class="fab fa-github"></i>
+                        </span>
+                        <span>Code</span>
+                        </a>
                       </span>
-                      <span>Supplementary</span>
-                    </a>
-                  </span>
 
-                  <!-- TODO: Replace with your GitHub repository URL -->
-                  <span class="link-block">
-                    <a href="https://github.com/YOUR REPO HERE" target="_blank"
-                    class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fab fa-github"></i>
-                    </span>
-                    <span>Code</span>
-                  </a>
-                </span>
-
-                <!-- TODO: Update with your arXiv paper ID -->
-                <span class="link-block">
-                  <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"
-                  class="external-link button is-normal is-rounded is-dark">
-                  <span class="icon">
-                    <i class="ai ai-arxiv"></i>
-                  </span>
-                  <span>arXiv</span>
-                </a>
-              </span>
-            </div>
+                      <!-- TODO: Update with your arXiv paper ID -->
+                      <span class="link-block">
+                        <a href="https://arxiv.org/abs/<ARXIV PAPER ID>" target="_blank"
+                        class="external-link button is-normal is-rounded is-dark">
+                        <span class="icon">
+                          <i class="ai ai-arxiv"></i>
+                        </span>
+                        <span>arXiv</span>
+                        </a>
+                      </span>
+                      
+                    </div>
+                  </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 </section>
 
 
@@ -358,9 +349,10 @@
       <div class="column is-four-fifths">
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
-          <!-- TODO: Replace with your paper abstract -->
+          
+          <!-- Abstract -->
           <p>
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ullamcorper tellus sed ante aliquam tempus. Etiam porttitor urna feugiat nibh elementum, et tempor dolor mattis. Donec accumsan enim augue, a vulputate nisi sodales sit amet. Proin bibendum ex eget mauris cursus euismod nec et nibh. Maecenas ac gravida ante, nec cursus dui. Vivamus purus nibh, placerat ac purus eget, sagittis vestibulum metus. Sed vestibulum bibendum lectus gravida commodo. Pellentesque auctor leo vitae sagittis suscipit.
+            With the rapid advancement of Large Language Models (LLMs), their capabilities in various automation domains, particularly Unmanned Aerial Vehicle (UAV) operations, have gathered increasing attention. Current research remains predominantly constrained to the deployment of LLMs in small-scale UAV applications, with most studies focusing on isolated components such as path planning for toy drones, while lacking comprehensive investigation of medium- and long-range UAV systems in real-world operational contexts. Larger UAV platforms introduce distinct challenges, including stringent requirements for airport-based take-off and landing procedures, adherence to complex regulatory frameworks, and specialized operational capabilities with elevated mission expectations. This paper presents the Next-Generation LLM for UAV (NeLV) system, a comprehensive framework that seamlessly integrates LLMs into multi-scale UAV operations. The NeLV system processes natural language instructions to orchestrate short-, medium-, and long-range UAV missions through five key technical components: (i) LLM-as-Parser for instruction interpretation, (ii) Route Planner for Points of Interest (POI) determination, (iii) Path Planner for waypoint generation, (iv) Control Platform for executable trajectory implementation, and (v) real UAV monitoring capabilities. We validate the system through three representative use cases: multi-UAV patrol, multi-POI delivery, and multi-hop relocation. This research not only synthesizes existing literature and demonstrates practical implementation but also establishes a comprehensive roadmap featuring a five-level automation taxonomy for the future development of LLM-powered autonomous aerial systems.
           </p>
         </div>
       </div>
@@ -370,45 +362,87 @@
 <!-- End paper abstract -->
 
 
-<!-- Image carousel -->
+<!-- Image carousel row -->
 <section class="hero is-small">
   <div class="hero-body">
     <div class="container">
-      <div id="results-carousel" class="carousel results-carousel">
-       <div class="item">
-        <!-- TODO: Replace with your research result images -->
-        <img src="static/images/carousel1.jpg" alt="First research result visualization" loading="lazy"/>
-        <!-- TODO: Replace with description of this result -->
-        <h2 class="subtitle has-text-centered">
-          First image description.
-        </h2>
-      </div>
-      <div class="item">
-        <!-- Your image here -->
-        <img src="static/images/carousel2.jpg" alt="Second research result visualization" loading="lazy"/>
-        <h2 class="subtitle has-text-centered">
-          Second image description.
-        </h2>
-      </div>
-      <div class="item">
-        <!-- Your image here -->
-        <img src="static/images/carousel3.jpg" alt="Third research result visualization" loading="lazy"/>
-        <h2 class="subtitle has-text-centered">
-         Third image description.
-       </h2>
-     </div>
-     <div class="item">
-      <!-- Your image here -->
-      <img src="static/images/carousel4.jpg" alt="Fourth research result visualization" loading="lazy"/>
-      <h2 class="subtitle has-text-centered">
-        Fourth image description.
-      </h2>
+      <div class="columns">
+
+        <!-- Use Case 1 -->
+        <div class="column is-one-third">
+          <h2 class="title is-5 has-text-centered">Use Case 1</h2>
+          <div id="carousel-1" class="carousel results-carousel">
+            <div class="item">
+              <img src="static/images/Use_Case_1_LLM.png" alt="Use Case 1 - LLM" loading="lazy"/>
+              <p class="has-text-centered">LLM</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_1_Path.png" alt="Use Case 1 - Path" loading="lazy"/>
+              <p class="has-text-centered">Path</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_1_Route.png" alt="Use Case 1 - Route" loading="lazy"/>
+              <p class="has-text-centered">Route</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_1_Traj.png" alt="Use Case 1 - Traj" loading="lazy"/>
+              <p class="has-text-centered">Traj</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Use Case 2 -->
+        <div class="column is-one-third">
+          <h2 class="title is-5 has-text-centered">Use Case 2</h2>
+          <div id="carousel-2" class="carousel results-carousel">
+            <div class="item">
+              <img src="static/images/Use_Case_2_LLM.png" alt="Use Case 2 - LLM" loading="lazy"/>
+              <p class="has-text-centered">LLM</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_2_Path.png" alt="Use Case 2 - Path" loading="lazy"/>
+              <p class="has-text-centered">Path</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_2_Route.png" alt="Use Case 2 - Route" loading="lazy"/>
+              <p class="has-text-centered">Route</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_2_Traj.png" alt="Use Case 2 - Traj" loading="lazy"/>
+              <p class="has-text-centered">Traj</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Use Case 3 -->
+        <div class="column is-one-third">
+          <h2 class="title is-5 has-text-centered">Use Case 3</h2>
+          <div id="carousel-3" class="carousel results-carousel">
+            <div class="item">
+              <img src="static/images/Use_Case_3_LLM.png" alt="Use Case 3 - LLM" loading="lazy"/>
+              <p class="has-text-centered">LLM</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_3_Path.png" alt="Use Case 3 - Path" loading="lazy"/>
+              <p class="has-text-centered">Path</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_3_Route.png" alt="Use Case 3 - Route" loading="lazy"/>
+              <p class="has-text-centered">Route</p>
+            </div>
+            <div class="item">
+              <img src="static/images/Use_Case_3_Traj.png" alt="Use Case 3 - Traj" loading="lazy"/>
+              <p class="has-text-centered">Traj</p>
+            </div>
+          </div>
+        </div>
+
+      </div> <!-- end columns -->
     </div>
   </div>
-</div>
-</div>
 </section>
-<!-- End image carousel -->
+<!-- End image carousel row -->
+
 
 
 
