@@ -10,7 +10,9 @@ from shapely.geometry import LineString
 class LongRoutePlanner:
     def __init__(self):
         self.tank_capacity = 80 # L
-        self.miles_per_liter = 10
+        self.km_per_liter = 10.95
+        self.miles_per_liter = self.km_per_liter * 0.621371
+        self.tlo_liters = 10.0
 
         self.airports_df = pd.read_csv('./data/usa_airports_fuel.csv')
         self.airports_df = self.airports_df.dropna(subset=['ICAO_ID'])
@@ -54,8 +56,7 @@ Output must be valid JSON with structure:
             ).argmax()
         ]
 
-    def find_optimal_routes(self, airports_df, start_idx, end_idx, tank_capacity, miles_per_liter):
-        range_capacity = tank_capacity * miles_per_liter
+    def find_optimal_routes(self, airports_df, start_idx, end_idx, tank_capacity):
         G_distance = nx.DiGraph()
         G_cost = nx.DiGraph()
         G_balanced = nx.DiGraph()
@@ -73,8 +74,9 @@ Output must be valid JSON with structure:
                 (airports_df.loc[to_idx, 'latitude'], airports_df.loc[to_idx, 'longitude']),
                 unit=Unit.MILES
             )
+            leg_liters = dist / self.miles_per_liter + self.tlo_liters
             
-            if dist <= range_capacity:
+            if leg_liters <= tank_capacity:
                 edges_data.append({
                     'from': start_idx, 
                     'to': to_idx, 
@@ -89,45 +91,52 @@ Output must be valid JSON with structure:
                     (airports_df.loc[to_idx, 'latitude'], airports_df.loc[to_idx, 'longitude']),
                     unit=Unit.MILES
                 )
-                
-                if dist <= range_capacity:
+                leg_liters = dist / self.miles_per_liter + self.tlo_liters
+                if leg_liters <= tank_capacity:
                     to_fuel_price = airports_df.loc[to_idx, 'fuel_price']
-                    if pd.notna(to_fuel_price):
-                        refuel_cost = (dist / miles_per_liter + 5) * to_fuel_price
-                    else:
-                        refuel_cost = float('inf')
+                    refuel_cost = (leg_liters * to_fuel_price) if pd.notna(to_fuel_price) else float('inf')
                     edges_data.append({
-                        'from': from_idx, 
-                        'to': to_idx, 
-                        'distance': dist, 
+                        'from': from_idx,
+                        'to': to_idx,
+                        'distance': dist,
                         'refuel_cost': refuel_cost,
                     })
-        
+
         for edge in edges_data:
             G_distance.add_edge(edge['from'], edge['to'], weight=edge['distance'])
-            G_cost.add_edge(edge['from'], edge['to'], weight=edge.get('refuel_cost', 0))
-        
+            if 'refuel_cost' in edge and np.isfinite(edge['refuel_cost']):
+                G_cost.add_edge(edge['from'], edge['to'], weight=edge['refuel_cost'])
+            else:
+                G_cost.add_edge(edge['from'], edge['to'], weight=float('inf'))
+
         if edges_data:
             distances = [edge['distance'] for edge in edges_data]
-            costs = [edge.get('refuel_cost', 0) for edge in edges_data]
+            costs = [edge['refuel_cost'] for edge in edges_data if 'refuel_cost' in edge and np.isfinite(edge['refuel_cost'])]
             min_dist, max_dist = min(distances), max(distances)
-            min_cost, max_cost = min(costs), max(costs)
+            dist_den = max(max_dist - min_dist, 1e-12)
+            if costs:
+                min_cost, max_cost = min(costs), max(costs)
+                cost_den = max(max_cost - min_cost, 1e-12)
+            else:
+                min_cost, cost_den = 0.0, 1.0
+
             for edge in edges_data:
                 dist = edge['distance']
-                cost = edge.get('refuel_cost', 0)
-                norm_dist = (dist - min_dist) / (max_dist - min_dist)
-                norm_cost = (cost - min_cost) / (max_cost - min_cost)
+                cost = edge.get('refuel_cost', None)
+                norm_dist = (dist - min_dist) / dist_den
+                norm_cost = ((cost - min_cost) / cost_den) if (cost is not None and np.isfinite(cost) and costs) else 1.0
                 G_balanced.add_edge(edge['from'], edge['to'], weight=0.5 * norm_dist + 0.5 * norm_cost)
 
         shortest_path = nx.dijkstra_path(G_distance, start_idx, end_idx, weight='weight')
         cheapest_path = nx.dijkstra_path(G_cost, start_idx, end_idx, weight='weight')
         balanced_path = nx.dijkstra_path(G_balanced, start_idx, end_idx, weight='weight')
-        
+
         return {
             'shortest': shortest_path,
             'cheapest': cheapest_path,
             'balanced': balanced_path
         }
+
 
     def plot_routes(self, airports_df, routes, start_idx, end_idx):
         fig, ax = plt.subplots(figsize=(10, 10))
@@ -199,7 +208,7 @@ Output must be valid JSON with structure:
         start_idx = self.airports_df[self.airports_df['name'] == start].index[0]
         end_idx = self.airports_df[self.airports_df['name'] == end].index[0]
         
-        routes = self.find_optimal_routes(self.airports_df, start_idx, end_idx, self.tank_capacity, self.miles_per_liter)
+        routes = self.find_optimal_routes(self.airports_df, start_idx, end_idx, self.tank_capacity)
         print(routes)
         
         self.plot_routes(self.airports_df, routes, start_idx, end_idx)
