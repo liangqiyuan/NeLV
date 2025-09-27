@@ -7,7 +7,7 @@
 🌐 **Project Page**: [https://liangqiyuan.github.io/NeLV/](https://liangqiyuan.github.io/NeLV/)
 
 <div align="center">
-    <img src="docs/static/images/Overview.png" alt="NeLV System Overview" style="width:80%;"/>
+    <img src="docs/static/images/Overview.png" alt="NeLV System Overview" style="width:50%;"/>
 </div>
 
 ## 🚁 Overview
