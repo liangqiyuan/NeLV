@@ -1,10 +1,8 @@
-# Next-Generation LLM for UAV (NeLV)
+# Next-Generation LLM for UAV: System Design, Real Implementation, Case Study, and Future Direction
 
 [![Python](https://img.shields.io/badge/Python_3.8+-306998?logo=python&logoColor=FFD43B)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-750014.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2025.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2025.xxxxx)
-
-> **System Design, Real Implementation, Case Study, and Future Direction**
 
 🌐 **Project Page**: [https://liangqiyuan.github.io/NeLV/](https://liangqiyuan.github.io/NeLV/)
 
