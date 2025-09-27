@@ -1,17 +1,17 @@
-# Next-Generation LLM for UAV: System Design, Real Implementation, Case Study, and Future Direction
+# Next-Generation LLM for UAV
 
 [![Python](https://img.shields.io/badge/Python_3.8+-306998?logo=python&logoColor=FFD43B)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-750014.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2025.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2025.xxxxx)
 
-## 🌐 Project Page: [https://liangqiyuan.github.io/NeLV/](https://liangqiyuan.github.io/NeLV/)
+## 🌐 [Project Page](https://liangqiyuan.github.io/NeLV/)
 
 The **Next-Generation LLM for UAV (NeLV)** system is a comprehensive full-stack framework that encompasses the entire operational pipeline from human instruction input to UAV flight mission execution.
 <div align="center">
     <img src="docs/static/images/Overview.png" alt="NeLV System Overview" style="width:30%;"/>
 </div>
 
-## 🚁 Overview
+## 🔥 System Overview
 
 NeLV processes natural language instructions to orchestrate multi-scale UAV missions through five key technical components:
 1. **🧠 LLM-as-Parser**: Interprets natural language instructions and extracts mission parameters
