@@ -4,10 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-750014.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2025.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2025.xxxxx)
 
-🌐 **Project Page**: [https://liangqiyuan.github.io/NeLV/](https://liangqiyuan.github.io/NeLV/)
+## 🌐 Project Page: [https://liangqiyuan.github.io/NeLV/](https://liangqiyuan.github.io/NeLV/)
 
 <div align="center">
-    <img src="docs/static/images/Overview.png" alt="NeLV System Overview" style="width:50%;"/>
+    <img src="docs/static/images/Overview.png" alt="NeLV System Overview" style="width:30%;"/>
 </div>
 
 ## 🚁 Overview
@@ -21,7 +21,7 @@ The **Next-Generation LLM for UAV (NeLV)** system is a comprehensive full-stack 
 5. **📡 Real UAV Monitoring**: Provides real-time flight monitoring and intervention capabilities
 
 <div align="center">
-    <img src="docs/static/images/System.png" alt="System Architecture" style="width:90%;"/>
+    <img src="docs/static/images/System.png" alt="System Architecture" style="width:100%;"/>
 </div>
 
 ## 🎯 Use Cases
