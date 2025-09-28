@@ -1,6 +1,6 @@
 # Next-Generation LLM for UAV
 
-[![Python](https://img.shields.io/badge/Python_3.8+-306998?logo=python&logoColor=FFD43B)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/Python_3.10-306998?logo=python&logoColor=FFD43B)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-750014.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2025.xxxxx-b31b1b.svg)](https://arxiv.org/abs/2025.xxxxx)
 [![Website](https://img.shields.io/badge/Project-Page-green?style=flat&logo=github-pages)](https://liangqiyuan.github.io/NeLV/)
