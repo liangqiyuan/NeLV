@@ -267,8 +267,8 @@ def createLocalCircuit(runway):
 # USERNAME = "Admin"
 # PASSWORD = "Distributed"
 CONNECTION_URL = "http://control-g-wndr.distributed-avionics.com"
-USERNAME = "ChuhaoDeng"
-PASSWORD = "Capture-Smartly7-Recount"
+USERNAME = "xxx"
+PASSWORD = "XXX"
 
 
 mission_file = "mission.json"
