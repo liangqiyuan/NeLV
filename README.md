@@ -7,12 +7,12 @@
 
 ## 🔥 System Overview
 
-The **Next-Generation LLM for UAV (NeLV)** system is a comprehensive full-stack framework that encompasses the entire operational pipeline from human instruction input to UAV flight mission execution. NeLV processes natural language instructions to orchestrate multi-scale UAV missions through five key technical components:
+The **Next-Generation LLM for UAV (NeLV)** system is an end-to-end framework that encompasses the entire operational pipeline from human instruction input to UAV flight mission execution. NeLV processes natural language instructions to orchestrate multi-scale UAV missions through five key technical components:
 1. **🧠 LLM-as-Parser**: Interprets natural language instructions and extracts mission parameters
 2. **🗺️ Route Planner**: Determines optimal Points of Interest (POI) based on mission requirements
 3. **📍 Path Planner**: Generates detailed waypoint sequences considering airspace and weather
 4. **🎮 Control Platform**: Creates executable trajectories with take-off/landing patterns
-5. **📡 Real UAV Monitoring**: Provides real-time flight monitoring and intervention capabilities
+5. **📡 UAV Monitor**: Provides real-time flight monitoring and intervention capabilities
 
 <div align="center">
     <img src="docs/static/images/System.png" alt="System Architecture" style="width:100%;"/>
@@ -99,7 +99,7 @@ If you use NeLV in your research, please cite our paper:
 
 ```bibtex
 @article{yuan2025nelv,
-  title={Next-Generation LLM for UAV: System Design, Real Implementation, Case Study, and Future Direction},
+  title={Next-Generation LLM for UAV: From Natural Language to Autonomous Flight},
   author={Yuan, Liangqi and Deng, Chuhao and Han, Dong-Jun and Hwang, Inseok and Brunswicker, Sabine and Brinton, Christopher G.},
   journal={arXiv preprint arXiv:2025.xxxxx},
   year={2025}
