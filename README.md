@@ -98,10 +98,10 @@ NeLV integrates with multiple data sources:
 If you use NeLV in your research, please cite our paper:
 
 ```bibtex
-@article{yuan2025nelv,
+@article{yuan2025next,
   title={Next-Generation LLM for UAV: From Natural Language to Autonomous Flight},
-  author={Yuan, Liangqi and Deng, Chuhao and Han, Dong-Jun and Hwang, Inseok and Brunswicker, Sabine and Brinton, Christopher G.},
-  journal={arXiv preprint arXiv:2025.xxxxx},
+  author={Yuan, Liangqi and Deng, Chuhao and Han, Dong-Jun and Hwang, Inseok and Brunswicker, Sabine and Brinton, Christopher G},
+  journal={arXiv preprint arXiv:2510.21739},
   year={2025}
-}
+} 
 ```
